@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import ImprovedRestaurantHours from '@/components/rest-hours-new';
+import RestHours from '@/components/rest-hours';
 
 // NOTE: Removed 'ai-customization' until we are ready to implement it - 9/19/24 RS
 const sections = ['restaurant-details', 'hours', 'restaurant-menu', 'additional-details', 'banking-information'];
@@ -219,7 +219,7 @@ export default function AddRestaurantDetails() {
                   </div>
                 )}
                 {section === 'hours' && (
-                  <ImprovedRestaurantHours
+                  <RestHours
                     hours={formData.restaurantHours}
                     onChange={handleRestaurantHoursChange}
                     onNext={() => goToNextSection('hours')}

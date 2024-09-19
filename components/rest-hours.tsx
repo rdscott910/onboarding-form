@@ -1,159 +1,118 @@
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+'use client';
 
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import React from 'react';
+import { PlusIcon, MinusIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
-import { PlusIcon }  from '@heroicons/react/24/outline';
+const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
+type DayOfWeek = (typeof daysOfWeek)[number];
 
-
-export default function RestHours() {
-  return (
-    <Accordion type="single" collapsible className="w-full">
-      <AccordionItem value="item-1">
-        <AccordionTrigger>Restaurant Hours</AccordionTrigger>
-        <AccordionContent>
-          <div className="flex flex-row w-full items-center justify-between gap-1 mb-2 overflow-auto ">
-            <div className="flex flex-col gap-1 border-b-2 border-gray-200">
-              <div className="flex flex-row gap-1 w-36 items-center text-center">
-                <p className="peer w-96 m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">Monday</p>
-                <div className="w-auto px-1 inline-block bg-primary hover:bg-gray-600 text-white rounded-md border border-gray-200 text-sm outline-2 py-[2px] text-center">
-                  <Popover>
-                    <PopoverTrigger className="w-auto flex flex-row justify-center items-center align-middle"><PlusIcon className="w-3 md:w-4" /></PopoverTrigger>
-                    <PopoverContent>Place content for the popover here.</PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              <div className="flex flex-row gap-1 justify-start w-full mb-3">
-                <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">8:00am to 3:00pm</p>
-                <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">5:00pm to 11:00pm</p>
-              </div>
-            </div>
-          </div>
-          {/* end Monday */}
-          <div className="flex flex-row w-full items-center justify-between gap-1 mb-2 overflow-auto ">
-            <div className="flex flex-col gap-1 border-b-2 border-gray-200">
-              <div className="flex flex-row gap-1 w-36 items-center text-center">
-                <p className="peer w-96 m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">Tuesday</p>
-                <div className="w-auto px-1 inline-block bg-primary hover:bg-gray-600 text-white rounded-md border border-gray-200 text-sm outline-2 py-[2px] text-center">
-                  <Popover>
-                    <PopoverTrigger className="w-auto flex flex-row justify-center items-center align-middle"><PlusIcon className="w-3 md:w-4" /></PopoverTrigger>
-                    <PopoverContent>Place content for the popover here.</PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              <div className="flex flex-row gap-1 justify-start w-full mb-3">
-                <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">8:00am to 3:00pm</p>
-                <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">5:00pm to 11:00pm</p>
-              </div>
-            </div>
-          </div>
-          {/* end Tuesday */}
-          <div className="flex flex-row w-full items-center justify-between gap-1 mb-2 overflow-auto ">
-            <div className="flex flex-col gap-1 border-b-2 border-gray-200">
-              <div className="flex flex-row gap-1 w-36 items-center text-center">
-                <p className="peer w-96 m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">Wednesday</p>
-                <div className="w-auto px-1 inline-block bg-primary hover:bg-gray-600 text-white rounded-md border border-gray-200 text-sm outline-2 py-[2px] text-center">
-                  <Popover>
-                    <PopoverTrigger className="w-auto flex flex-row justify-center items-center align-middle"><PlusIcon className="w-3 md:w-4" /></PopoverTrigger>
-                    <PopoverContent>Place content for the popover here.</PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              <div className="flex flex-row gap-1 justify-start w-full mb-3">
-              <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">8:00am to 3:00pm</p>
-              <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">5:00pm to 11:00pm</p>
-              </div>
-            </div>
-          </div>
-          {/* end Wednesday */}
-          <div className="flex flex-row w-full items-center justify-between gap-1 mb-2 overflow-auto ">
-            <div className="flex flex-col gap-1 border-b-2 border-gray-200">
-              <div className="flex flex-row gap-1 w-36 items-center text-center">
-                <p className="peer w-96 m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">Thursday</p>
-                <div className="w-auto px-1 inline-block bg-primary hover:bg-gray-600 text-white rounded-md border border-gray-200 text-sm outline-2 py-[2px] text-center">
-                  <Popover>
-                    <PopoverTrigger className="w-auto flex flex-row justify-center items-center align-middle"><PlusIcon className="w-3 md:w-4" /></PopoverTrigger>
-                    <PopoverContent>Place content for the popover here.</PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              <div className="flex flex-row gap-1 justify-start w-full mb-3">
-              <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">8:00am to 3:00pm</p>
-              <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">5:00pm to 11:00pm</p>
-              </div>
-            </div>
-          </div>
-          {/* end Thursday */}
-          <div className="flex flex-row w-full items-center justify-between gap-1 mb-2 overflow-auto ">
-            <div className="flex flex-col gap-1 border-b-2 border-gray-200">
-              <div className="flex flex-row gap-1 w-36 items-center text-center">
-                <p className="peer w-96 m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">Friday</p>
-                <div className="w-auto px-1 inline-block bg-primary hover:bg-gray-600 text-white rounded-md border border-gray-200 text-sm outline-2 py-[2px] text-center">
-                  <Popover>
-                    <PopoverTrigger className="w-auto flex flex-row justify-center items-center align-middle"><PlusIcon className="w-3 md:w-4" /></PopoverTrigger>
-                    <PopoverContent>Place content for the popover here.</PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              <div className="flex flex-row gap-1 justify-start w-full mb-3">
-              <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">8:00am to 3:00pm</p>
-              <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">5:00pm to 11:00pm</p>
-              </div>
-            </div>
-          </div>
-          {/* end Friday */}
-          <div className="flex flex-row w-full items-center justify-between gap-1 mb-2 overflow-auto ">
-            <div className="flex flex-col gap-1 border-b-2 border-gray-200">
-              <div className="flex flex-row gap-1 w-36 items-center text-center">
-                <p className="peer w-96 m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">Saturday</p>
-                <div className="w-auto px-1 inline-block bg-primary hover:bg-gray-600 text-white rounded-md border border-gray-200 text-sm outline-2 py-[2px] text-center">
-                  <Popover>
-                    <PopoverTrigger className="w-auto flex flex-row justify-center items-center align-middle"><PlusIcon className="w-3 md:w-4" /></PopoverTrigger>
-                    <PopoverContent>Place content for the popover here.</PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              <div className="flex flex-row gap-1 justify-start w-full mb-3">
-              <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">8:00am to 3:00pm</p>
-              <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">5:00pm to 11:00pm</p>
-              </div>
-            </div>
-          </div>
-          {/* end Saturday */}
-          <div className="flex flex-row w-full items-center justify-between gap-1 mb-2 overflow-auto ">
-            <div className="flex flex-col gap-1 border-b-2 border-gray-200">
-              <div className="flex flex-row gap-1 w-36 items-center text-center">
-                <p className="peer w-96 m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">Sunday</p>
-                <div className="w-auto px-1 inline-block bg-primary hover:bg-gray-600 text-white rounded-md border border-gray-200 text-sm outline-2 py-[2px] text-center">
-                  <Popover>
-                    <PopoverTrigger className="w-auto flex flex-row justify-center items-center align-middle"><PlusIcon className="w-3 md:w-4" /></PopoverTrigger>
-                    <PopoverContent>Place content for the popover here.</PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              <div className="flex flex-row gap-1 justify-start w-full mb-3">
-              <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">8:00am to 3:00pm</p>
-              <p className="peer block w-fit m-auto px-3 rounded-md border border-gray-200 py-[9px] text-sm outline-2 placeholder:text-gray-500">5:00pm to 11:00pm</p>
-              </div>
-            </div>
-          </div>
-          {/* end Sunday */}
-          <div className="flex justify-center mt-8 w-full">
-            <button className="px-4 py-2 text-white text-lg font-light bg-blue-500 w-full rounded-md hover:bg-blue-600">
-              Next
-            </button>
-          </div>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
-  )
+interface TimeRange {
+  openTime: string;
+  closeTime: string;
 }
 
+type RestaurantHours = {
+  [key in DayOfWeek]?: TimeRange[];
+};
+
+interface RestHoursProps {
+  hours: RestaurantHours;
+  onChange: (hours: RestaurantHours) => void;
+  onNext: () => void;
+}
+
+interface TimeInputProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const TimeInput: React.FC<TimeInputProps> = ({ value, onChange }) => (
+  <Input type="time" value={value} onChange={(e) => onChange(e.target.value)} className="w-28 bg-gray-700 text-white border-gray-600" />
+);
+
+interface HoursPairProps {
+  openTime: string;
+  closeTime: string;
+  onOpenChange: (value: string) => void;
+  onCloseChange: (value: string) => void;
+  onRemove: () => void;
+}
+
+const HoursPair: React.FC<HoursPairProps> = ({ openTime, closeTime, onOpenChange, onCloseChange, onRemove }) => (
+  <div className="flex items-center space-x-2 mb-2">
+    <TimeInput value={openTime} onChange={onOpenChange} />
+    <span className="text-gray-400">to</span>
+    <TimeInput value={closeTime} onChange={onCloseChange} />
+    <Button variant="ghost" size="icon" onClick={onRemove}>
+      <MinusIcon className="h-4 w-4 text-gray-400" />
+    </Button>
+  </div>
+);
+
+interface DayHoursProps {
+  day: DayOfWeek;
+  hours: TimeRange[];
+  onChange: (hours: TimeRange[]) => void;
+}
+
+const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange }) => {
+  const addHours = () => {
+    onChange([...hours, { openTime: '09:00', closeTime: '17:00' }]);
+  };
+
+  const updateHours = (index: number, field: keyof TimeRange, value: string) => {
+    const newHours = [...hours];
+    newHours[index] = { ...newHours[index], [field]: value };
+    onChange(newHours);
+  };
+
+  const removeHours = (index: number) => {
+    const newHours = hours.filter((_, i) => i !== index);
+    onChange(newHours);
+  };
+
+  return (
+    <div className="flex items-center space-x-4 py-2 border-b border-gray-700">
+      <div className="w-28 text-gray-300">{day}</div>
+      <div className="flex-grow">
+        {hours.map((hour, index) => (
+          <HoursPair
+            key={index}
+            openTime={hour.openTime}
+            closeTime={hour.closeTime}
+            onOpenChange={(value) => updateHours(index, 'openTime', value)}
+            onCloseChange={(value) => updateHours(index, 'closeTime', value)}
+            onRemove={() => removeHours(index)}
+          />
+        ))}
+        {hours.length === 0 && <div className="text-gray-500 italic">Closed</div>}
+      </div>
+      <Button variant="ghost" size="icon" onClick={addHours}>
+        <PlusIcon className="h-4 w-4 text-gray-400" />
+      </Button>
+    </div>
+  );
+};
+
+const RestHours: React.FC<RestHoursProps> = ({ hours, onChange, onNext }) => {
+  const updateHours = (day: DayOfWeek, newHours: TimeRange[]) => {
+    onChange({ ...hours, [day]: newHours });
+  };
+
+  return (
+    <div className="w-full max-w-3xl mx-auto bg-gray-800 text-white p-6 rounded-lg shadow-lg">
+      {daysOfWeek.map((day) => (
+        <DayHours key={day} day={day} hours={hours[day] || []} onChange={(newHours) => updateHours(day, newHours)} />
+      ))}
+      <div className="mt-6">
+        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onNext}>
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default RestHours;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckIcon, AlertTriangle } from 'lucide-react';
@@ -10,6 +10,7 @@ import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe
 const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
 if (!stripeKey) {
+  console.error('Stripe publishable key is not defined');
   throw new Error('Stripe publishable key is not defined');
 }
 const stripePromise = loadStripe(stripeKey);
@@ -80,14 +81,14 @@ const pricingPlans: PricingPlan[] = [
   },
 ];
 
-export default function SubscriptionPage() {
-  const fetchClientSecret = useCallback(() => {
+const Subscribe = () => {
+  const fetchClientSecret = useCallback(async () => {
     // Create a Checkout Session
-    return fetch('/api', {
+    const res = await fetch('/api', {
       method: 'POST',
-    })
-      .then((res) => res.json())
-      .then((data) => data.clientSecret);
+    });
+    const data = await res.json();
+    return data.clientSecret;
   }, []);
 
   const options = { fetchClientSecret };
@@ -202,4 +203,12 @@ export default function SubscriptionPage() {
         ))}
     </div>
   );
-}
+};
+
+const SubscribePage = () => (
+  <Suspense fallback="Loading...">
+    <Subscribe />
+  </Suspense>
+);
+
+export default SubscribePage;

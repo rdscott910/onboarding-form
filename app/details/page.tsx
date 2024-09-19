@@ -12,7 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import ImprovedRestaurantHours from '@/components/rest-hours-new';
 
-const sections = ['restaurant-details', 'hours', 'restaurant-menu', 'additional-details', 'banking-information', 'ai-customization'];
+// NOTE: Removed 'ai-customization' until we are ready to implement it - 9/19/24 RS
+const sections = ['restaurant-details', 'hours', 'restaurant-menu', 'additional-details', 'banking-information'];
 
 type RestaurantHours = {
   [key: string]: { openTime: string; closeTime: string }[];
@@ -373,15 +374,12 @@ export default function AddRestaurantDetails() {
                         placeholder="000123456789"
                       />
                     </div>
-                    <Button
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => goToNextSection('banking-information')}
-                    >
-                      Next
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSubmit}>
+                      Submit Restaurant Details
                     </Button>
                   </div>
                 )}
-                {section === 'ai-customization' && (
+                {/* {section === 'ai-customization' && (
                   <div className="space-y-4 mt-4">
                     <div>
                       <Label htmlFor="greeting">Greeting- How do you want Virnika to answer the phone?</Label>
@@ -419,7 +417,7 @@ export default function AddRestaurantDetails() {
                       Submit Restaurant Details
                     </Button>
                   </div>
-                )}
+                )} */}
               </AccordionContent>
             </AccordionItem>
           ))}

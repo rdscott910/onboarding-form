@@ -104,14 +104,14 @@ export default function CreateAccount() {
           </div>
         </form>
 
-        <div className="text-center">
+        {/* <div className="text-center">
           <p className="mt-2 text-sm text-gray-400">
             Already have an account?{' '}
             <Link href="/login" className="font-medium text-blue-400 hover:text-blue-300">
               Log in
             </Link>
           </p>
-        </div>
+        </div> */}
       </div>
     </div>
   );

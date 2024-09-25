@@ -4,6 +4,7 @@ import React from 'react';
 import { PlusIcon, MinusIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 type DayOfWeek = (typeof daysOfWeek)[number];
@@ -32,6 +33,7 @@ const TimeInput: React.FC<TimeInputProps> = ({ value, onChange }) => (
   <Input type="time" value={value} onChange={(e) => onChange(e.target.value)} className="w-28 bg-gray-700 text-white border-gray-600" />
 );
 
+/// HoursPair component
 interface HoursPairProps {
   openTime: string;
   closeTime: string;
@@ -45,12 +47,29 @@ const HoursPair: React.FC<HoursPairProps> = ({ openTime, closeTime, onOpenChange
     <TimeInput value={openTime} onChange={onOpenChange} />
     <span className="text-gray-400">to</span>
     <TimeInput value={closeTime} onChange={onCloseChange} />
-    <Button variant="ghost" size="icon" onClick={onRemove}>
-      <MinusIcon className="h-4 w-4 text-gray-400" />
-    </Button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="default"
+            onClick={onRemove}
+            className="text-red-500 p-2 bg-transparent border-red-500 border border-opacity-30 hover:text-red-600 hover:bg-red-800 hover:bg-opacity-10 hover:border-red-600"
+          >
+            <MinusIcon className="h-5 w-5" />
+            <span className="ml-1 text-xs">Remove</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Remove Hours</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   </div>
 );
+/// End of HoursPair component
 
+/// DayHours component
 interface DayHoursProps {
   day: DayOfWeek;
   hours: TimeRange[];
@@ -87,15 +106,32 @@ const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange }) => {
             onRemove={() => removeHours(index)}
           />
         ))}
-        {hours.length === 0 && <div className="text-gray-500 italic">Closed</div>}
+        {hours.length === 0 && <div className="text-red-400 italic bg-red-900 bg-opacity-20 rounded-md px-2 py-1 inline-block">Closed</div>}
       </div>
-      <Button variant="ghost" size="icon" onClick={addHours}>
-        <PlusIcon className="h-4 w-4 text-gray-400" />
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="default"
+              onClick={addHours}
+              className="text-green-500 p-2 bg-transparent border-green-500 border border-opacity-30 hover:text-green-600 hover:bg-green-800 hover:bg-opacity-10 hover:border-green-600"
+            >
+              <PlusIcon className="h-5 w-5" />
+              <span className="ml-1 text-xs">Add</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Add Hours</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 };
+/// End of DayHours component
 
+/// RestHours component
 const RestHours: React.FC<RestHoursProps> = ({ hours, onChange, onNext }) => {
   const updateHours = (day: DayOfWeek, newHours: TimeRange[]) => {
     onChange({ ...hours, [day]: newHours });

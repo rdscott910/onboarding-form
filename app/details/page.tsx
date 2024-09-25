@@ -108,7 +108,7 @@ export default function AddRestaurantDetails() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold text-center mb-2">Add restaurant details</h1>
         <p className="text-center text-gray-400 mb-8">
           Wanting to add multiple restaurants? Create an account for your first location and you can quickly create more locations after
@@ -200,7 +200,7 @@ export default function AddRestaurantDetails() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="monthlyOrders">Your monthly average for orders placed by phone</Label>
+                        <Label htmlFor="monthlyOrders">Average Number of Orders Placed by Phone Each Month</Label>
                         <Input
                           id="monthlyOrders"
                           name="monthlyOrders"

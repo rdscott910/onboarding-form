@@ -106,7 +106,15 @@ const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange }) => {
             onRemove={() => removeHours(index)}
           />
         ))}
-        {hours.length === 0 && <div className="text-red-400 italic bg-red-900 bg-opacity-20 rounded-md px-2 py-1 inline-block">Closed</div>}
+        {hours.length === 0 && (
+          <div
+            className="
+          text-red-400 italic bg-red-900 bg-opacity-20 rounded-md px-2 py-1 inline-block
+          "
+          >
+            Closed
+          </div>
+        )}
       </div>
       <TooltipProvider>
         <Tooltip>
@@ -115,7 +123,10 @@ const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange }) => {
               variant="ghost"
               size="default"
               onClick={addHours}
-              className="text-green-500 p-2 bg-transparent border-green-500 border border-opacity-30 hover:text-green-600 hover:bg-green-800 hover:bg-opacity-10 hover:border-green-600"
+              className="
+              text-green-500 p-2 bg-transparent border-green-500 border border-opacity-30 
+              hover:text-green-600 hover:bg-green-800 hover:bg-opacity-10 hover:border-green-600
+              "
             >
               <PlusIcon className="h-5 w-5" />
               <span className="ml-1 text-xs">Add</span>

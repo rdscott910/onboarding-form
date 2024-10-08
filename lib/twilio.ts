@@ -10,8 +10,8 @@ interface TwilioIncomingPhoneNumber {
 }
 
 // Assuming these are defined elsewhere in your application
-const TWILIO_VOICE_WEBHOOK_URL: string = process.env.TWILIO_VOICE_WEBHOOK_URL || '';
-const TWILIO_MESSAGING_SERVICE_SID: string = process.env.TWILIO_MESSAGING_SERVICE_SID || '';
+const TWILIO_VOICE_WEBHOOK_URL: string = process.env.TWILIO_VOICE_WEBHOOK_URL || 'https://phone-1r5q.onrender.com/incoming';
+const TWILIO_MESSAGING_SERVICE_SID: string = process.env.TWILIO_MESSAGING_SERVICE_SID || 'MGc18b4b77846960e86aa58224ee21f958';
 const twilioClient: Twilio = new Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 async function deployTwilioNumber(restaurantName: string, streetAddr: string): Promise<string> {

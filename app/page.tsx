@@ -2,7 +2,7 @@
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import Link from 'next/link';
+import { getCsrfToken } from '@/lib/csrfToken';
 
 export default function CreateAccount() {
   const router = useRouter();
@@ -12,13 +12,43 @@ export default function CreateAccount() {
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.name && formData.email && formData.password) {
-      router.push('/details');
+      setIsSubmitting(true);
+      setError(null);
+      try {
+        const csrfToken = await getCsrfToken();
+        const formDataToSubmit = new FormData();
+        formDataToSubmit.append('name', formData.name);
+        formDataToSubmit.append('email', formData.email);
+        formDataToSubmit.append('password', formData.password);
+
+        const response = await fetch('/api/save-root-form', {
+          method: 'POST',
+          headers: {
+            'X-CSRF-Token': csrfToken,
+          },
+          body: formDataToSubmit,
+        });
+
+        if (response.ok) {
+          router.push('/details');
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to submit form');
+        }
+      } catch (error) {
+        console.error('Error submitting form:', error);
+        setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      } finally {
+        setIsSubmitting(false);
+      }
     } else {
-      alert('Please fill out all fields');
+      setError('Please fill out all fields');
     }
   };
 
@@ -94,24 +124,18 @@ export default function CreateAccount() {
             </div>
           </div>
 
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={isSubmitting}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Next
+              {isSubmitting ? 'Submitting...' : 'Next'}
             </button>
           </div>
         </form>
-
-        {/* <div className="text-center">
-          <p className="mt-2 text-sm text-gray-400">
-            Already have an account?{' '}
-            <Link href="/login" className="font-medium text-blue-400 hover:text-blue-300">
-              Log in
-            </Link>
-          </p>
-        </div> */}
       </div>
     </div>
   );

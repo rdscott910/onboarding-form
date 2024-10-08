@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Info, Check } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -11,76 +10,107 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import RestHours from '@/components/rest-hours';
+import { PartialUserData, RestaurantHours, PartialRestaurantHours, WeekDay } from '@/lib/types';
 
-// NOTE: Removed 'ai-customization' until we are ready to implement it - 9/19/24 RS
 const sections = ['restaurant-details', 'hours', 'restaurant-menu', 'additional-details', 'banking-information'];
 
-type RestaurantHours = {
-  [key: string]: { openTime: string; closeTime: string }[];
+const initialFormData: PartialUserData = {
+  name: '',
+  street_address: '',
+  website_url: '',
+  contact_number: '',
+  ordering_url: '',
+  menu_theme_and_description: '',
+  history_and_story: '',
+  seating_options: '',
+  parking_options: '',
+  reservation_policy: '',
+  disability_info: '',
+  kid_friendly: '',
+  customer_can_reach_manager: false,
+  greeting: '',
 };
-
-interface FormData {
-  restaurantName: string;
-  streetAddress: string;
-  website: string;
-  phoneNumber: string;
-  internalName: string;
-  monthlyOrders: string;
-  restaurantHours: RestaurantHours;
-  onlineOrderingUrl: string;
-  restaurantOverview: string;
-  location: string;
-  diningOptions: string;
-  parkingOptions: string;
-  reservationPolicy: string;
-  promotionalSchedules: string;
-  accessibility: string;
-  offerHighChairs: boolean;
-  forwardCalls: boolean;
-  routingNumber: string;
-  accountNumber: string;
-  greeting: string;
-  selectedVoice: string;
-}
 
 export default function AddRestaurantDetails() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState<string[]>(['restaurant-details']);
   const [completedSections, setCompletedSections] = useState<string[]>([]);
-  const [formData, setFormData] = useState<FormData>({
-    restaurantName: '',
-    streetAddress: '',
-    website: '',
-    phoneNumber: '',
-    internalName: '',
-    monthlyOrders: '',
-    restaurantHours: {},
-    onlineOrderingUrl: '',
-    restaurantOverview: '',
-    location: '',
-    diningOptions: '',
-    parkingOptions: '',
-    reservationPolicy: '',
-    promotionalSchedules: '',
-    accessibility: '',
-    offerHighChairs: false,
-    forwardCalls: false,
-    routingNumber: '',
-    accountNumber: '',
-    greeting: '',
-    selectedVoice: 'Voice 1',
-  });
+  const [formData, setFormData] = useState<PartialUserData>(initialFormData);
+  const [restaurantHours, setRestaurantHours] = useState<PartialRestaurantHours[]>([]);
+
+  const handleRestaurantHoursChange = (newHours: PartialRestaurantHours[]) => {
+    setRestaurantHours(newHours);
+  };
+
+  useEffect(() => {
+    const fetchFormData = async () => {
+      try {
+        const response = await fetch('/api/get-form-data');
+        if (!response.ok) {
+          throw new Error('Failed to fetch form data');
+        }
+        const data = await response.json();
+        if (data.formData) {
+          setFormData(data.formData);
+          // Set completed sections based on filled data
+          const completed = Object.entries(data.formData).reduce((acc, [key, value]) => {
+            if (value && typeof value === 'object' && Object.keys(value).length > 0) {
+              acc.push(sections.find((section) => section.includes(key)) || '');
+            } else if (value && typeof value !== 'object') {
+              acc.push(sections.find((section) => section.includes(key)) || '');
+            }
+            return acc;
+          }, [] as string[]);
+          setCompletedSections([...new Set(completed.filter(Boolean))]);
+        }
+      } catch (error) {
+        console.error('Error fetching form data:', error);
+        setError('An error occurred while retrieving your data. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFormData();
+  }, []);
 
   const toggleSection = (section: string) => {
     setOpenSections([section]);
   };
 
-  const goToNextSection = (currentSection: string) => {
+  const tempStoreFormData = async () => {
+    const fullFormData = {
+      ...formData,
+      restaurant_hours: restaurantHours,
+    };
+
+    try {
+      const response = await fetch('/api/save-form-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fullFormData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save form data');
+      }
+    } catch (error) {
+      console.error('Error saving form data:', error);
+      setError('An error occurred while saving your progress. Please try again.');
+    }
+  };
+
+  const goToNextSection = async (currentSection: string) => {
+    await tempStoreFormData();
     const currentIndex = sections.indexOf(currentSection);
     if (currentIndex < sections.length - 1) {
       toggleSection(sections[currentIndex + 1]);
     }
-    setCompletedSections((prev) => [...prev, currentSection]);
+    setCompletedSections((prev) => [...new Set([...prev, currentSection])]);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -92,19 +122,36 @@ export default function AddRestaurantDetails() {
     setFormData((prevData) => ({ ...prevData, [name]: checked }));
   };
 
-  const handleRestaurantHoursChange = (newHours: RestaurantHours) => {
-    setFormData((prevData) => ({ ...prevData, restaurantHours: newHours }));
-  };
-
-  const handleSubmit = () => {
-    console.log('Form data to submit:', formData);
-    // Here you would typically send the data to your backend
-
-    // After submitting, route to the /pricing page
+  const handleSubmit = async () => {
+    await tempStoreFormData();
     router.push('/pricing');
   };
 
   const isCompleted = (section: string) => completedSections.includes(section);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Error</h1>
+          <p>{error}</p>
+          <Button className="mt-4" onClick={() => router.push('/')}>
+            Go back to home
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8">
@@ -143,21 +190,21 @@ export default function AddRestaurantDetails() {
                   <div className="space-y-4 mt-4 w-full">
                     <div className="grid grid-cols-2 gap-3 p-1">
                       <div>
-                        <Label htmlFor="restaurantName">Restaurant&apos;s Name</Label>
+                        <Label htmlFor="name">Restaurant's Name</Label>
                         <Input
-                          id="restaurantName"
-                          name="restaurantName"
-                          value={formData.restaurantName}
+                          id="name"
+                          name="name"
+                          value={formData.name}
                           onChange={handleInputChange}
                           className="bg-gray-900 border-[#2E2E2E] border-spacing-2"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="streetAddress">Restaurant&apos;s Street Address</Label>
+                        <Label htmlFor="street_address">Restaurant's Street Address</Label>
                         <Input
-                          id="streetAddress"
-                          name="streetAddress"
-                          value={formData.streetAddress}
+                          id="street_address"
+                          name="street_address"
+                          value={formData.street_address}
                           onChange={handleInputChange}
                           className="bg-gray-900 border-[#2E2E2E]"
                         />
@@ -165,46 +212,21 @@ export default function AddRestaurantDetails() {
                     </div>
                     <div className="grid grid-cols-2 gap-3 p-1">
                       <div>
-                        <Label htmlFor="website">Restaurant&apos;s Website</Label>
+                        <Label htmlFor="website_url">Restaurant's Website</Label>
                         <Input
-                          id="website"
-                          name="website"
-                          value={formData.website}
+                          id="website_url"
+                          name="website_url"
+                          value={formData.website_url}
                           onChange={handleInputChange}
                           className="bg-gray-900 border-[#2E2E2E]"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="phoneNumber">Restaurant&apos;s Phone Number</Label>
+                        <Label htmlFor="contact_number">Restaurant's Phone Number</Label>
                         <Input
-                          id="phoneNumber"
-                          name="phoneNumber"
-                          value={formData.phoneNumber}
-                          onChange={handleInputChange}
-                          className="bg-gray-900 border-[#2E2E2E]"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 p-1">
-                      <div>
-                        <Label htmlFor="internalName" className="flex items-center">
-                          Internal Restaurant Name
-                          <Info className="inline-block ml-2 h-4 w-4" />
-                        </Label>
-                        <Input
-                          id="internalName"
-                          name="internalName"
-                          value={formData.internalName}
-                          onChange={handleInputChange}
-                          className="bg-gray-900 border-[#2E2E2E]"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="monthlyOrders">Average Number of Orders Placed by Phone Each Month</Label>
-                        <Input
-                          id="monthlyOrders"
-                          name="monthlyOrders"
-                          value={formData.monthlyOrders}
+                          id="contact_number"
+                          name="contact_number"
+                          value={formData.contact_number}
                           onChange={handleInputChange}
                           className="bg-gray-900 border-[#2E2E2E]"
                         />
@@ -219,20 +241,16 @@ export default function AddRestaurantDetails() {
                   </div>
                 )}
                 {section === 'hours' && (
-                  <RestHours
-                    hours={formData.restaurantHours}
-                    onChange={handleRestaurantHoursChange}
-                    onNext={() => goToNextSection('hours')}
-                  />
+                  <RestHours hours={restaurantHours} onChange={handleRestaurantHoursChange} onNext={() => goToNextSection('hours')} />
                 )}
                 {section === 'restaurant-menu' && (
                   <div className="space-y-4 mt-4">
                     <div>
-                      <Label htmlFor="onlineOrderingUrl">Online ordering URL</Label>
+                      <Label htmlFor="ordering_url">Online ordering URL</Label>
                       <Input
-                        id="onlineOrderingUrl"
-                        name="onlineOrderingUrl"
-                        value={formData.onlineOrderingUrl}
+                        id="ordering_url"
+                        name="ordering_url"
+                        value={formData.ordering_url}
                         onChange={handleInputChange}
                         className="bg-gray-900 border-[#2E2E2E]"
                         placeholder="Enter URL"
@@ -247,100 +265,85 @@ export default function AddRestaurantDetails() {
                 {section === 'additional-details' && (
                   <div className="space-y-4 mt-4">
                     <div>
-                      <Label htmlFor="restaurantOverview">
+                      <Label htmlFor="history_and_story">
                         Give us an in-depth overview on the history, theme and story of your restaurant
                       </Label>
                       <Textarea
-                        id="restaurantOverview"
-                        name="restaurantOverview"
-                        value={formData.restaurantOverview}
+                        id="history_and_story"
+                        name="history_and_story"
+                        value={formData.history_and_story}
                         onChange={handleInputChange}
                         className="bg-gray-900 border-[#2E2E2E]"
                         placeholder="Write what you would want your best employee to know?"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="location">Where are you located in general?</Label>
+                      <Label htmlFor="seating_options">Dining options (indoor/outdoor/patio, etc)</Label>
                       <Input
-                        id="location"
-                        name="location"
-                        value={formData.location}
-                        onChange={handleInputChange}
-                        className="bg-gray-900 border-[#2E2E2E]"
-                        placeholder='Not your address, but how a employee would respond. "We are on Mill Rd across the street from the Target"'
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="diningOptions">Dining options (indoor/outdoor/patio, etc)</Label>
-                      <Input
-                        id="diningOptions"
-                        name="diningOptions"
-                        value={formData.diningOptions}
+                        id="seating_options"
+                        name="seating_options"
+                        value={formData.seating_options}
                         onChange={handleInputChange}
                         className="bg-gray-900 border-[#2E2E2E]"
                         placeholder="Write your answer here"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="parkingOptions">Parking Options</Label>
+                      <Label htmlFor="parking_options">Parking Options</Label>
                       <Input
-                        id="parkingOptions"
-                        name="parkingOptions"
-                        value={formData.parkingOptions}
+                        id="parking_options"
+                        name="parking_options"
+                        value={formData.parking_options}
                         onChange={handleInputChange}
                         className="bg-gray-900 border-[#2E2E2E]"
                         placeholder="Write your answer here"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="reservationPolicy">Reservation policy</Label>
+                      <Label htmlFor="reservation_policy">Reservation policy</Label>
                       <Input
-                        id="reservationPolicy"
-                        name="reservationPolicy"
-                        value={formData.reservationPolicy}
+                        id="reservation_policy"
+                        name="reservation_policy"
+                        value={formData.reservation_policy}
                         onChange={handleInputChange}
                         className="bg-gray-900 border-[#2E2E2E]"
                         placeholder="Write your answer here"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="promotionalSchedules">Are their promotional schedules?</Label>
-                      <Input
-                        id="promotionalSchedules"
-                        name="promotionalSchedules"
-                        value={formData.promotionalSchedules}
-                        onChange={handleInputChange}
-                        className="bg-gray-900 border-[#2E2E2E]"
-                        placeholder="Write your answer here"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="accessibility">
+                      <Label htmlFor="disability_info">
                         Tell us about physical accessibility in your restaurant. Give practical information and insights for guests that use
                         wheelchairs or are visually impaired, etc.
                       </Label>
                       <Textarea
-                        id="accessibility"
-                        name="accessibility"
-                        value={formData.accessibility}
+                        id="disability_info"
+                        name="disability_info"
+                        value={formData.disability_info}
                         onChange={handleInputChange}
                         className="bg-gray-900 border-[#2E2E2E]"
                         placeholder="There is wheelchair elevator available on the south side of the building across from the H&R Block"
                       />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="offerHighChairs">Do you offer high-chairs?</Label>
-                      <Switch
-                        id="offerHighChairs"
-                        checked={formData.offerHighChairs}
-                        onCheckedChange={handleSwitchChange('offerHighChairs')}
+                    <div>
+                      <Label htmlFor="kid_friendly">Do you offer high-chairs or other kid-friendly options?</Label>
+                      <Input
+                        id="kid_friendly"
+                        name="kid_friendly"
+                        value={formData.kid_friendly}
+                        onChange={handleInputChange}
+                        className="bg-gray-900 border-[#2E2E2E]"
+                        placeholder="Write your answer here"
                       />
                     </div>
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="forwardCalls">
+                      <Label htmlFor="customer_can_reach_manager">
                         If a caller wants to reach a manager or owner, would you like them to be forwarded directly to the restaurant phone?
                       </Label>
-                      <Switch id="forwardCalls" checked={formData.forwardCalls} onCheckedChange={handleSwitchChange('forwardCalls')} />
+                      <Switch
+                        id="customer_can_reach_manager"
+                        checked={formData.customer_can_reach_manager}
+                        onCheckedChange={handleSwitchChange('customer_can_reach_manager')}
+                      />
                     </div>
                     <Button
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white"
@@ -353,25 +356,14 @@ export default function AddRestaurantDetails() {
                 {section === 'banking-information' && (
                   <div className="space-y-4 mt-4">
                     <div>
-                      <Label htmlFor="routingNumber">Routing Number</Label>
+                      <Label htmlFor="greeting">Greeting - How do you want Virnika to answer the phone?</Label>
                       <Input
-                        id="routingNumber"
-                        name="routingNumber"
-                        value={formData.routingNumber}
+                        id="greeting"
+                        name="greeting"
+                        value={formData.greeting}
                         onChange={handleInputChange}
                         className="bg-gray-900 border-[#2E2E2E]"
-                        placeholder="000000000"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="accountNumber">Account Number</Label>
-                      <Input
-                        id="accountNumber"
-                        name="accountNumber"
-                        value={formData.accountNumber}
-                        onChange={handleInputChange}
-                        className="bg-gray-900 border-[#2E2E2E]"
-                        placeholder="000123456789"
+                        placeholder="Thank you for calling [restaurant name], a digital assistant, how can I help you?"
                       />
                     </div>
                     <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSubmit}>
@@ -379,45 +371,6 @@ export default function AddRestaurantDetails() {
                     </Button>
                   </div>
                 )}
-                {/* {section === 'ai-customization' && (
-                  <div className="space-y-4 mt-4">
-                    <div>
-                      <Label htmlFor="greeting">Greeting- How do you want Virnika to answer the phone?</Label>
-                      <Input
-                        id="greeting"
-                        name="greeting"
-                        value={formData.greeting}
-                        onChange={handleInputChange}
-                        className="bg-gray-900 border-[#2E2E2E]"
-                        placeholder="Phone greeting"
-                      />
-                      <p className="text-sm text-gray-400 mt-1">
-                        We recommend &ldquo;Thank you for calling [restaurant name], a digital assistant, how can I help you?&rdquo;
-                      </p>
-                    </div>
-                    <div>
-                      <Label>Pick your Virnika voice</Label>
-                      <div className="grid grid-cols-3 gap-4 mt-2">
-                        {['Voice 1', 'Voice 2', 'Voice 3'].map((voice) => (
-                          <Button
-                            key={voice}
-                            variant="outline"
-                            className={`bg-gray-900 border-[#2E2E2E] text-white hover:bg-[#2E2E2E] ${
-                              formData.selectedVoice === voice ? 'ring-2 ring-blue-500' : ''
-                            }`}
-                            onClick={() => setFormData((prevData) => ({ ...prevData, selectedVoice: voice }))}
-                          >
-                            {voice}
-                            <span className="ml-2">▶</span>
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSubmit}>
-                      Submit Restaurant Details
-                    </Button>
-                  </div>
-                )} */}
               </AccordionContent>
             </AccordionItem>
           ))}

@@ -17,6 +17,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return_url: `${req.headers.get('origin')}/success?session_id={CHECKOUT_SESSION_ID}`,
     });
 
+    console.log('Session: ', session);
+
     return NextResponse.json({ clientSecret: session.client_secret });
   } catch (err) {
     if (err instanceof Stripe.errors.StripeError) {

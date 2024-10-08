@@ -1,6 +1,10 @@
-import React from 'react';
-import Link from 'next/link';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import { CheckIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { getCsrfToken } from '@/lib/csrfToken';
+import { PartialUserData } from '@/lib/types';
 
 interface PlanFeature {
   name: string;
@@ -69,12 +73,45 @@ const pricingPlans: PricingPlan[] = [
 ];
 
 export default function PricingPage() {
+  const [formData, setFormData] = useState<PartialUserData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchFormData = async () => {
+      try {
+        const response = await fetch('/api/get-form-data');
+        console.log('Response: ', response.ok);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Data: ', data);
+          setFormData(data.formData);
+        } else {
+          throw new Error('Failed to fetch form data');
+        }
+      } catch (error) {
+        console.error('Error fetching form data:', error);
+        setError('Failed to load form data. Please try again later.');
+      }
+    };
+
+    fetchFormData();
+  }, []);
+
+  if (error) {
+    return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">{error}</div>;
+  }
+
+  if (!formData) {
+    return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">Loading...</div>;
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <h1 className="text-4xl font-bold text-center mb-12">Pick your plan</h1>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
         {pricingPlans.map((plan) => (
-          <PricingCard key={plan.id} plan={plan} />
+          <PricingCard key={plan.id} plan={plan} formData={formData} />
         ))}
       </div>
     </div>
@@ -83,9 +120,50 @@ export default function PricingPage() {
 
 interface PricingCardProps {
   plan: PricingPlan;
+  formData: any;
 }
 
-function PricingCard({ plan }: PricingCardProps) {
+function PricingCard({ plan, formData }: PricingCardProps) {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleChoosePlan = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const csrfToken = await getCsrfToken();
+      const response = await fetch('/api/save-form-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken,
+        },
+        body: JSON.stringify({
+          ...formData,
+          selectedPlan: plan.id,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          router.push('/subscribe');
+        } else {
+          throw new Error(data.message || 'Failed to save plan selection');
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save plan selection');
+      }
+    } catch (error) {
+      console.error('Error saving plan selection:', error);
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="bg-gray-800 rounded-lg p-8 flex flex-col">
       <h2 className="text-2xl font-bold mb-2">{plan.title}</h2>
@@ -100,14 +178,16 @@ function PricingCard({ plan }: PricingCardProps) {
           </li>
         ))}
       </ul>
-      <Link
-        href={{
-          pathname: '/subscribe',
-          query: { plan: plan.id },
-        }}
+      <button
+        onClick={handleChoosePlan}
+        disabled={isLoading}
+        className={`bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors ${
+          isLoading ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
       >
-        <button className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">Choose Plan</button>
-      </Link>
+        {isLoading ? 'Processing...' : 'Choose Plan'}
+      </button>
+      {error && <p className="text-red-500 mt-2">{error}</p>}
     </div>
   );
 }

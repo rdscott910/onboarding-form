@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getCsrfToken } from '@/lib/csrfToken';
-import { PartialUserData } from '@/lib/types';
+import { PartialLocationData } from '@/lib/types/types';
 
 interface PlanFeature {
   name: string;
@@ -73,37 +73,85 @@ const pricingPlans: PricingPlan[] = [
 ];
 
 export default function PricingPage() {
-  const [formData, setFormData] = useState<PartialUserData | null>(null);
+  const [formData, setFormData] = useState<PartialLocationData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const fetchFormData = async () => {
       try {
-        const response = await fetch('/api/get-form-data');
-        console.log('Response: ', response.ok);
+        const csrfToken = await getCsrfToken();
+        console.log('CSRF Token:', csrfToken);
+
+        const response = await fetch('/api/get-form-data', {
+          headers: {
+            'X-CSRF-Token': csrfToken,
+          },
+        });
+        console.log('Response status: ', response.status);
+
+        const data = await response.json();
+        console.log('Received data: ', data);
+
         if (response.ok) {
-          const data = await response.json();
-          console.log('Data: ', data);
-          setFormData(data.formData);
+          if (data.formData) {
+            console.log('Setting form data:', data.formData);
+            setFormData(data.formData);
+          } else {
+            console.log('Form data is null in the response');
+            setError('No form data found. Please complete the previous steps first.');
+          }
         } else {
-          throw new Error('Failed to fetch form data');
+          throw new Error(data.error || 'Failed to fetch form data');
         }
       } catch (error) {
         console.error('Error fetching form data:', error);
-        setError('Failed to load form data. Please try again later.');
+        setError(error instanceof Error ? error.message : 'An unexpected error occurred while loading form data');
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchFormData();
   }, []);
 
+  if (isLoading) {
+    return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">Loading...</div>;
+  }
+
   if (error) {
-    return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">{error}</div>;
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Error</h2>
+          <p>{error}</p>
+          <button
+            className="mt-4 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+            onClick={() => router.push('/details')}
+          >
+            Go back to details page
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!formData) {
-    return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">No Data Found</h2>
+          <p>We couldn't find your previous details. Please go back and fill them in.</p>
+          <button
+            className="mt-4 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+            onClick={() => router.push('/details')}
+          >
+            Go to details page
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

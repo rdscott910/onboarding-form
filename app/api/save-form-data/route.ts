@@ -1,33 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
-import serverStore from '@/lib/server-store';
+import { updateRegistrationData, getOrCreateRegistration, type SessionData } from '@/lib/supabase-client';
+import { ExtendedPartialServerStoreData } from '@/lib/types/types';
+import { hasRequiredEmail } from '@/lib/types/types';
+import { cookies } from 'next/headers';
+
+const SESSION_COOKIE_NAME = 'onboarding_session';
 
 export async function POST(request: NextRequest) {
-  const formData = await request.json();
-  const cookies = request.cookies;
-  let submissionId = cookies.get('submissionId')?.value;
-  console.log('Get cookie:', submissionId);
+  try {
+    const formData: ExtendedPartialServerStoreData = await request.json();
 
-  if (!submissionId) {
-    submissionId = uuidv4();
-    console.log('New submission ID:', submissionId);
+    // Get current session
+    const sessionCookie = cookies().get(SESSION_COOKIE_NAME)?.value;
+    let session: SessionData | null = null;
 
-    // Set the cookie in the response
-    const response = NextResponse.json({ success: true });
-    response.cookies.set('submissionId', submissionId, { maxAge: 3600 * 24, path: '/' });
-    console.log('Check cookie:', response.cookies.get('submissionId')?.value);
+    try {
+      session = sessionCookie ? (JSON.parse(sessionCookie) as SessionData) : null;
+    } catch (error) {
+      console.error('Error parsing session cookie:', error);
+    }
 
-    // Store the data
-    serverStore.set(submissionId, formData, 3600 * 24); // Store for 24 hours
-    return response;
-  } else {
-    // append to existing data
-    const existingData = serverStore.get(submissionId);
-    console.log('Existing data:', existingData);
-    const mergedData = { ...existingData, ...formData };
-    console.log('Merged data:', mergedData);
-    serverStore.set(submissionId, mergedData, 3600 * 24); // Store for 24 hours
-    // serverStore.set(submissionId, formData, 3600 * 24); // Store for 24 hours
-    return NextResponse.json({ success: true });
+    // Validate email presence
+    if (!hasRequiredEmail(formData)) {
+      return NextResponse.json({ success: false, message: 'Email is required' }, { status: 400 });
+    }
+
+    // If no session exists or email changed, create/get registration
+    if (!session || session.primary_email !== formData.primary_email) {
+      const newSession = await getOrCreateRegistration(formData.primary_email, formData);
+      if (!newSession) {
+        return NextResponse.json({ success: false, message: 'Failed to create registration' }, { status: 500 });
+      }
+
+      // Update session cookie
+      cookies().set(SESSION_COOKIE_NAME, JSON.stringify(newSession), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 60 * 60 * 24, // 24 hours
+        path: '/',
+      });
+
+      session = newSession;
+    }
+
+    // Update the registration data
+    const success = await updateRegistrationData(formData.primary_email, formData);
+    if (!success) {
+      return NextResponse.json({ success: false, message: 'Failed to update registration data' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Data saved successfully',
+      registrationId: session.registrationId,
+      primary_email: session.primary_email,
+    });
+  } catch (error) {
+    console.error('Error in save-form-data:', error);
+    return NextResponse.json({ success: false, message: 'An unexpected error occurred' }, { status: 500 });
   }
 }

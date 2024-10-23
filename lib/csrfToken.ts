@@ -6,7 +6,12 @@ export const getCsrfToken = async (): Promise<string> => {
   if (!csrfToken || !tokenTimestamp || currentTime - tokenTimestamp > 3600000) {
     // 1 hour
     try {
-      const response = await fetch('/api/csrf');
+      const response = await fetch('/api/csrf', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         csrfToken = data.csrfToken;

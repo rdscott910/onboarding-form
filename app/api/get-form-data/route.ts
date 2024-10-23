@@ -1,42 +1,43 @@
-// import { NextResponse } from 'next/server';
-// import { cookies } from 'next/headers';
-// import serverStore from '@/lib/server-store';
-
-// export async function GET() {
-//   const submissionId = cookies().get('submissionId')?.value;
-
-//   if (!submissionId) {
-//     return NextResponse.json({ formData: null });
-//   }
-
-//   const formData = serverStore.get(submissionId);
-
-//   if (!formData) {
-//     return NextResponse.json({ formData: null });
-//   }
-
-//   return NextResponse.json({ formData });
-// }
-
 import { NextResponse } from 'next/server';
+import { getRegistrationData, type SessionData } from '@/lib/supabase-client';
+import { GetFormDataResponse } from '@/lib/types/types';
 import { cookies } from 'next/headers';
-import serverStore from '@/lib/server-store';
-import { PartialUserData } from '@/lib/types';
 
-export async function GET() {
-  const submissionId = cookies().get('submissionId')?.value;
+export async function GET(request: Request) {
+  console.log('GET request received for /api/get-form-data');
 
-  if (!submissionId) {
-    return NextResponse.json({ error: 'No submission ID found' }, { status: 400 });
+  const csrfToken = request.headers.get('X-CSRF-Token');
+  console.log('CSRF Token:', csrfToken ? 'Present: ' + csrfToken : 'Missing');
+
+  // Get session data from cookie
+  const sessionCookie = cookies().get('onboarding_session')?.value;
+  let session: SessionData | null = null;
+
+  try {
+    session = sessionCookie ? (JSON.parse(sessionCookie) as SessionData) : null;
+  } catch (error) {
+    console.error('Error parsing session cookie:', error);
   }
 
-  const userData: PartialUserData = serverStore.get(submissionId);
+  console.log('Session found:', session ? 'Yes' : 'No');
 
-  if (!userData) {
-    console.log('No user data found for submission ID:', submissionId);
-    //return empty formData
-    return NextResponse.json({ formData: null });
-    // return NextResponse.json({ error: 'No user data found' }, { status: 404 });
+  if (!session?.primary_email) {
+    console.log('No valid session found');
+    return NextResponse.json({
+      formData: null,
+      registrationId: null,
+    } as GetFormDataResponse);
+  }
+
+  const formData = await getRegistrationData(session.primary_email);
+  console.log('Form data found:', formData ? 'Yes' : 'No');
+
+  if (!formData) {
+    console.log('No form data found for email:', session.primary_email);
+    return NextResponse.json({
+      formData: null,
+      registrationId: session.registrationId,
+    } as GetFormDataResponse);
   }
 
   // Remove sensitive information
@@ -46,8 +47,34 @@ export async function GET() {
     manager_email,
     twilio_number,
     phone_tree_extensions,
-    ...safeUserData
-  } = userData;
+    banking_info,
+    ...safeFormData
+  } = formData;
 
-  return NextResponse.json(safeUserData);
+  // Mask banking information
+  const maskedBankingInfo = banking_info
+    ? {
+        routing_number:
+          banking_info.routing_number.length > 4
+            ? '*'.repeat(banking_info.routing_number.length - 4) + banking_info.routing_number.slice(-4)
+            : banking_info.routing_number,
+        account_number:
+          banking_info.account_number.length > 4
+            ? '*'.repeat(banking_info.account_number.length - 4) + banking_info.account_number.slice(-4)
+            : banking_info.account_number,
+      }
+    : undefined;
+
+  const responseData: GetFormDataResponse = {
+    formData: {
+      ...safeFormData,
+      banking_info: maskedBankingInfo,
+      primary_email: session.primary_email,
+      registrationId: session.registrationId,
+    },
+    registrationId: session.registrationId,
+  };
+
+  console.log('Sending response with formData:', JSON.stringify(responseData));
+  return NextResponse.json(responseData);
 }

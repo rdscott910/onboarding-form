@@ -1,24 +1,23 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { validateCSRFToken } from '@/lib/csrf';
+import { NextRequest, NextResponse } from 'next/server';
+import { authMiddleware } from '@/app/middleware/auth';
+import { csrfMiddleware } from '@/app/middleware/csrf';
+import { loggingMiddleware } from '@/app/middleware/logging';
 
-export async function middleware(request: NextRequest) {
-  if (request.method !== 'GET' && request.method !== 'HEAD') {
-    const csrfToken = request.headers.get('X-CSRF-Token');
-    if (!csrfToken) {
-      return new NextResponse(JSON.stringify({ success: false, message: 'CSRF token missing' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+export async function middleware(req: NextRequest) {
+  // Skip auth for public endpoints
+  const publicPaths = ['/api/csrf', '/api/save-form-data'];
+  const isPublicPath = publicPaths.some((path) => req.nextUrl.pathname.startsWith(path));
 
-    const isValidCSRF = await validateCSRFToken(csrfToken);
-    if (!isValidCSRF) {
-      return new NextResponse(JSON.stringify({ success: false, message: 'Invalid CSRF token' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+  const response = await loggingMiddleware(req);
+  if (response) return response;
+
+  const csrfResponse = await csrfMiddleware(req);
+  if (csrfResponse) return csrfResponse;
+
+  // Only apply auth middleware for protected routes
+  if (!isPublicPath) {
+    const authResponse = await authMiddleware(req);
+    if (authResponse) return authResponse;
   }
 
   return NextResponse.next();

@@ -5,48 +5,45 @@ import { PlusIcon, MinusIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
-const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
-type DayOfWeek = (typeof daysOfWeek)[number];
-
-interface TimeRange {
-  openTime: string;
-  closeTime: string;
-}
-
-type RestaurantHours = {
-  [key in DayOfWeek]?: TimeRange[];
-};
+import { RestaurantHours, TstzRange, WeekDay } from '@/lib/types/types';
 
 interface RestHoursProps {
-  hours: RestaurantHours;
-  onChange: (hours: RestaurantHours) => void;
-  onNext: () => void;
+  hours: RestaurantHours[];
+  onChange: (hours: RestaurantHours[]) => void;
+  onNext: () => Promise<void>;
+  isSaving?: boolean;
 }
 
 interface TimeInputProps {
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }
 
-const TimeInput: React.FC<TimeInputProps> = ({ value, onChange }) => (
-  <Input type="time" value={value} onChange={(e) => onChange(e.target.value)} className="w-28 bg-gray-700 text-white border-gray-600" />
+const TimeInput: React.FC<TimeInputProps> = ({ value, onChange, disabled }) => (
+  <Input
+    type="time"
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    className="w-28 bg-gray-700 text-white border-gray-600"
+    disabled={disabled}
+  />
 );
 
-/// HoursPair component
 interface HoursPairProps {
   openTime: string;
   closeTime: string;
   onOpenChange: (value: string) => void;
   onCloseChange: (value: string) => void;
   onRemove: () => void;
+  disabled?: boolean;
 }
 
-const HoursPair: React.FC<HoursPairProps> = ({ openTime, closeTime, onOpenChange, onCloseChange, onRemove }) => (
+const HoursPair: React.FC<HoursPairProps> = ({ openTime, closeTime, onOpenChange, onCloseChange, onRemove, disabled }) => (
   <div className="flex items-center space-x-2 mb-2">
-    <TimeInput value={openTime} onChange={onOpenChange} />
+    <TimeInput value={openTime} onChange={onOpenChange} disabled={disabled} />
     <span className="text-gray-400">to</span>
-    <TimeInput value={closeTime} onChange={onCloseChange} />
+    <TimeInput value={closeTime} onChange={onCloseChange} disabled={disabled} />
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -54,7 +51,8 @@ const HoursPair: React.FC<HoursPairProps> = ({ openTime, closeTime, onOpenChange
             variant="ghost"
             size="default"
             onClick={onRemove}
-            className="text-red-500 p-2 bg-transparent border-red-500 border border-opacity-30 hover:text-red-600 hover:bg-red-800 hover:bg-opacity-10 hover:border-red-600"
+            disabled={disabled}
+            className="text-red-500 p-2 bg-transparent border-red-500 border border-opacity-30 hover:text-red-600 hover:bg-red-800 hover:bg-opacity-10 hover:border-red-600 disabled:opacity-50"
           >
             <MinusIcon className="h-5 w-5" />
             <span className="ml-1 text-xs">Remove</span>
@@ -67,23 +65,25 @@ const HoursPair: React.FC<HoursPairProps> = ({ openTime, closeTime, onOpenChange
     </TooltipProvider>
   </div>
 );
-/// End of HoursPair component
 
-/// DayHours component
 interface DayHoursProps {
-  day: DayOfWeek;
-  hours: TimeRange[];
-  onChange: (hours: TimeRange[]) => void;
+  day: WeekDay;
+  hours: TstzRange[];
+  onChange: (hours: TstzRange[]) => void;
+  disabled?: boolean;
 }
 
-const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange }) => {
+const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange, disabled }) => {
   const addHours = () => {
-    onChange([...hours, { openTime: '09:00', closeTime: '17:00' }]);
+    onChange([...hours, { start: new Date(), end: new Date() }]);
   };
 
-  const updateHours = (index: number, field: keyof TimeRange, value: string) => {
+  const updateHours = (index: number, field: keyof TstzRange, value: string) => {
     const newHours = [...hours];
-    newHours[index] = { ...newHours[index], [field]: value };
+    const [hours_, minutes] = value.split(':').map(Number);
+    const newDate = new Date(newHours[index][field]);
+    newDate.setHours(hours_, minutes);
+    newHours[index] = { ...newHours[index], [field]: newDate };
     onChange(newHours);
   };
 
@@ -94,27 +94,20 @@ const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange }) => {
 
   return (
     <div className="flex items-center space-x-4 py-2 border-b border-gray-700">
-      <div className="w-28 text-gray-300">{day}</div>
+      <div className="w-28 text-gray-300">{WeekDay[day]}</div>
       <div className="flex-grow">
         {hours.map((hour, index) => (
           <HoursPair
             key={index}
-            openTime={hour.openTime}
-            closeTime={hour.closeTime}
-            onOpenChange={(value) => updateHours(index, 'openTime', value)}
-            onCloseChange={(value) => updateHours(index, 'closeTime', value)}
+            openTime={hour.start.toTimeString().slice(0, 5)}
+            closeTime={hour.end.toTimeString().slice(0, 5)}
+            onOpenChange={(value) => updateHours(index, 'start', value)}
+            onCloseChange={(value) => updateHours(index, 'end', value)}
             onRemove={() => removeHours(index)}
+            disabled={disabled}
           />
         ))}
-        {hours.length === 0 && (
-          <div
-            className="
-          text-red-400 italic bg-red-900 bg-opacity-20 rounded-md px-2 py-1 inline-block
-          "
-          >
-            Closed
-          </div>
-        )}
+        {hours.length === 0 && <div className="text-red-400 italic bg-red-900 bg-opacity-20 rounded-md px-2 py-1 inline-block">Closed</div>}
       </div>
       <TooltipProvider>
         <Tooltip>
@@ -123,10 +116,8 @@ const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange }) => {
               variant="ghost"
               size="default"
               onClick={addHours}
-              className="
-              text-green-500 p-2 bg-transparent border-green-500 border border-opacity-30 
-              hover:text-green-600 hover:bg-green-800 hover:bg-opacity-10 hover:border-green-600
-              "
+              disabled={disabled}
+              className="text-green-500 p-2 bg-transparent border-green-500 border border-opacity-30 hover:text-green-600 hover:bg-green-800 hover:bg-opacity-10 hover:border-green-600 disabled:opacity-50"
             >
               <PlusIcon className="h-5 w-5" />
               <span className="ml-1 text-xs">Add</span>
@@ -140,22 +131,35 @@ const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange }) => {
     </div>
   );
 };
-/// End of DayHours component
 
-/// RestHours component
-const RestHours: React.FC<RestHoursProps> = ({ hours, onChange, onNext }) => {
-  const updateHours = (day: DayOfWeek, newHours: TimeRange[]) => {
-    onChange({ ...hours, [day]: newHours });
+const WEEKDAYS = Array.from({ length: 7 }, (_, i) => i) as WeekDay[];
+
+const RestHours: React.FC<RestHoursProps> = ({ hours, onChange, onNext, isSaving = false }) => {
+  const updateHours = (day: WeekDay, newHours: TstzRange[]) => {
+    const updatedHours = [...hours];
+    const existingDayIndex = updatedHours.findIndex((h) => h.day_of_week === day);
+    if (existingDayIndex !== -1) {
+      updatedHours[existingDayIndex] = { ...updatedHours[existingDayIndex], hours: newHours };
+    } else {
+      updatedHours.push({ day_of_week: day, hours: newHours, timezone: 'UTC' } as RestaurantHours);
+    }
+    onChange(updatedHours);
   };
 
   return (
     <div className="w-full max-w-3xl mx-auto bg-gray-800 text-white p-6 rounded-lg shadow-lg">
-      {daysOfWeek.map((day) => (
-        <DayHours key={day} day={day} hours={hours[day] || []} onChange={(newHours) => updateHours(day, newHours)} />
+      {WEEKDAYS.map((day) => (
+        <DayHours
+          key={day}
+          day={day}
+          hours={hours.find((h) => h.day_of_week === day)?.hours || []}
+          onChange={(newHours) => updateHours(day, newHours)}
+          disabled={isSaving}
+        />
       ))}
       <div className="mt-6">
-        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onNext}>
-          Next
+        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" onClick={onNext} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Next'}
         </Button>
       </div>
     </div>

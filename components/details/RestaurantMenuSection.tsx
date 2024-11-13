@@ -7,11 +7,12 @@ import { PartialServerStoreData } from '@/lib/types/types';
 interface RestaurantMenuSectionProps {
   formData: PartialServerStoreData;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onNext: () => void;
+  onNext: () => Promise<void>;
+  onBack: () => void;
   isSaving: boolean;
 }
 
-export default function RestaurantMenuSection({ formData, onChange, onNext, isSaving }: RestaurantMenuSectionProps) {
+export default function RestaurantMenuSection({ formData, onChange, onNext, onBack, isSaving }: RestaurantMenuSectionProps) {
   return (
     <div className="space-y-4 mt-4">
       <div>
@@ -27,9 +28,14 @@ export default function RestaurantMenuSection({ formData, onChange, onNext, isSa
         />
         <p className="text-sm text-gray-400 mt-1">Leave blank if there is none</p>
       </div>
-      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onNext} disabled={isSaving}>
-        {isSaving ? 'Saving...' : 'Next'}
-      </Button>
+      <div className="flex gap-4">
+        <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white" onClick={onBack} disabled={isSaving}>
+          Back
+        </Button>
+        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onNext} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Next'}
+        </Button>
+      </div>
     </div>
   );
 }

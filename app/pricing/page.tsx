@@ -4,7 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { CheckIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getCsrfToken } from '@/lib/csrfToken';
-import { PartialLocationData } from '@/lib/types/types';
+import { PartialServerStoreData } from '@/lib/types/types';
+import { Button } from '@/components/ui/button';
+import { type SessionData } from '@/lib/supabase-client';
 
 interface PlanFeature {
   name: string;
@@ -17,6 +19,13 @@ interface PricingPlan {
   price: string;
   description: string;
   features: PlanFeature[];
+}
+
+interface PageState {
+  isLoading: boolean;
+  error: string | null;
+  formData: PartialServerStoreData | null;
+  session: SessionData | null;
 }
 
 const pricingPlans: PricingPlan[] = [
@@ -73,82 +82,93 @@ const pricingPlans: PricingPlan[] = [
 ];
 
 export default function PricingPage() {
-  const [formData, setFormData] = useState<PartialLocationData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const [state, setState] = useState<PageState>({
+    isLoading: true,
+    error: null,
+    formData: null,
+    session: null,
+  });
 
   useEffect(() => {
     const fetchFormData = async () => {
       try {
         const csrfToken = await getCsrfToken();
-        console.log('CSRF Token:', csrfToken);
-
         const response = await fetch('/api/get-form-data', {
           headers: {
             'X-CSRF-Token': csrfToken,
           },
         });
-        console.log('Response status: ', response.status);
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch form data');
+        }
 
         const data = await response.json();
-        console.log('Received data: ', data);
 
-        if (response.ok) {
-          if (data.formData) {
-            console.log('Setting form data:', data.formData);
-            setFormData(data.formData);
-          } else {
-            console.log('Form data is null in the response');
-            setError('No form data found. Please complete the previous steps first.');
-          }
+        if (data.formData) {
+          // Extract session data if available
+          const session =
+            data.formData.primary_email && data.registrationId
+              ? {
+                  primary_email: data.formData.primary_email,
+                  registrationId: data.registrationId,
+                }
+              : null;
+
+          setState((prev) => ({
+            ...prev,
+            formData: data.formData,
+            session,
+            isLoading: false,
+          }));
         } else {
-          throw new Error(data.error || 'Failed to fetch form data');
+          setState((prev) => ({
+            ...prev,
+            error: 'No form data found. Please complete the previous steps first.',
+            isLoading: false,
+          }));
         }
       } catch (error) {
         console.error('Error fetching form data:', error);
-        setError(error instanceof Error ? error.message : 'An unexpected error occurred while loading form data');
-      } finally {
-        setIsLoading(false);
+        setState((prev) => ({
+          ...prev,
+          error: error instanceof Error ? error.message : 'An unexpected error occurred',
+          isLoading: false,
+        }));
       }
     };
 
     fetchFormData();
   }, []);
 
-  if (isLoading) {
+  if (state.isLoading) {
     return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">Loading...</div>;
   }
 
-  if (error) {
+  if (state.error) {
     return (
       <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Error</h2>
-          <p>{error}</p>
-          <button
-            className="mt-4 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-            onClick={() => router.push('/details')}
-          >
+          <p>{state.error}</p>
+          <Button className="mt-4" onClick={() => router.push('/details')}>
             Go back to details page
-          </button>
+          </Button>
         </div>
       </div>
     );
   }
 
-  if (!formData) {
+  if (!state.formData || !state.session) {
     return (
       <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">No Data Found</h2>
-          <p>We couldn't find your previous details. Please go back and fill them in.</p>
-          <button
-            className="mt-4 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-            onClick={() => router.push('/details')}
-          >
+          <p>We couldn&apos;t find your previous details. Please go back and fill them in.</p>
+          <Button className="mt-4" onClick={() => router.push('/details')}>
             Go to details page
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -159,7 +179,7 @@ export default function PricingPage() {
       <h1 className="text-4xl font-bold text-center mb-12">Pick your plan</h1>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
         {pricingPlans.map((plan) => (
-          <PricingCard key={plan.id} plan={plan} formData={formData} />
+          <PricingCard key={plan.id} plan={plan} formData={state.formData} session={state.session} />
         ))}
       </div>
     </div>
@@ -168,10 +188,11 @@ export default function PricingPage() {
 
 interface PricingCardProps {
   plan: PricingPlan;
-  formData: any;
+  formData: PartialServerStoreData | null;
+  session: SessionData | null;
 }
 
-function PricingCard({ plan, formData }: PricingCardProps) {
+function PricingCard({ plan, formData, session }: PricingCardProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,6 +200,7 @@ function PricingCard({ plan, formData }: PricingCardProps) {
   const handleChoosePlan = async () => {
     setIsLoading(true);
     setError(null);
+
     try {
       const csrfToken = await getCsrfToken();
       const response = await fetch('/api/save-form-data', {
@@ -190,19 +212,21 @@ function PricingCard({ plan, formData }: PricingCardProps) {
         body: JSON.stringify({
           ...formData,
           selectedPlan: plan.id,
+          primary_email: session?.primary_email,
+          registrationId: session?.registrationId,
         }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          router.push('/subscribe');
-        } else {
-          throw new Error(data.message || 'Failed to save plan selection');
-        }
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to save plan selection');
+      }
+
+      if (data.success) {
+        router.push('/subscribe');
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save plan selection');
+        throw new Error(data.message || 'Failed to save plan selection');
       }
     } catch (error) {
       console.error('Error saving plan selection:', error);
@@ -226,15 +250,9 @@ function PricingCard({ plan, formData }: PricingCardProps) {
           </li>
         ))}
       </ul>
-      <button
-        onClick={handleChoosePlan}
-        disabled={isLoading}
-        className={`bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors ${
-          isLoading ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
-      >
+      <Button onClick={handleChoosePlan} disabled={isLoading} className={isLoading ? 'opacity-50' : ''}>
         {isLoading ? 'Processing...' : 'Choose Plan'}
-      </button>
+      </Button>
       {error && <p className="text-red-500 mt-2">{error}</p>}
     </div>
   );

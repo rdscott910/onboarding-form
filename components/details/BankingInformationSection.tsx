@@ -11,6 +11,7 @@ interface BankingInformationSectionProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onBankingInfoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit: () => void;
+  onBack: () => void;
   isSaving: boolean;
 }
 
@@ -19,6 +20,7 @@ export default function BankingInformationSection({
   onChange,
   onBankingInfoChange,
   onSubmit,
+  onBack,
   isSaving,
 }: BankingInformationSectionProps) {
   return (
@@ -59,9 +61,14 @@ export default function BankingInformationSection({
           disabled={isSaving}
         />
       </div>
-      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onSubmit} disabled={isSaving}>
-        {isSaving ? 'Saving...' : 'Submit Restaurant Details'}
-      </Button>
+      <div className="flex gap-4">
+        <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white" onClick={onBack} disabled={isSaving}>
+          Back
+        </Button>
+        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onSubmit} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Submit Restaurant Details'}
+        </Button>
+      </div>
     </div>
   );
 }

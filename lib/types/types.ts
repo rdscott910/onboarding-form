@@ -103,8 +103,8 @@ export type PartialLocationData = Partial<FullLocationData>;
 export interface ServerStoreData extends PartialLocationData {
   restaurant_hours: RestaurantHours[];
   banking_info?: {
-    routing_number: string;
-    account_number: string;
+    routing_number?: string;
+    account_number?: string;
   };
   hashedPassword?: string;
   primary_email?: string;
@@ -117,6 +117,7 @@ export interface ExtendedPartialServerStoreData extends PartialServerStoreData {
 export interface PartialServerStoreData extends Partial<ServerStoreData> {
   registrationId?: string;
   primary_email?: string;
+  selectedPlan?: string;
 }
 
 export interface GetFormDataResponse {

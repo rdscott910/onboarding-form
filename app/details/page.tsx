@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Accordion } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { PartialServerStoreData, GetFormDataResponse } from '@/lib/types/types';
-import { SessionData } from '@/lib/types/session';
 import { getCsrfToken } from '@/lib/csrfToken';
 import { updateRegistrationData } from '@/lib/supabase-client';
 import AccordionSection from '@/components/details/AccordionSection';
+
+import { type SessionData } from '@/lib/supabase-client';
 
 const INITIAL_FORM_DATA: PartialServerStoreData = {
   name: '',
@@ -40,7 +41,7 @@ const SECTIONS: Section[] = ['restaurant-details', 'hours', 'restaurant-menu', '
 interface PageState {
   isLoading: boolean;
   error: string | null;
-  openSections: Section[];
+  currentSection: Section;
   completedSections: Section[];
   formData: PartialServerStoreData;
   session: SessionData | null;
@@ -51,7 +52,7 @@ export default function AddRestaurantDetails() {
   const [state, setState] = useState<PageState>({
     isLoading: true,
     error: null,
-    openSections: ['restaurant-details'],
+    currentSection: 'restaurant-details',
     completedSections: [],
     formData: INITIAL_FORM_DATA,
     session: null,
@@ -121,6 +122,13 @@ export default function AddRestaurantDetails() {
     });
   };
 
+  const handleSectionChange = (section: Section) => {
+    setState((prev) => ({
+      ...prev,
+      currentSection: section,
+    }));
+  };
+
   const handleFormUpdate = (updates: Partial<PartialServerStoreData>) => {
     setState((prev) => ({
       ...prev,
@@ -131,8 +139,11 @@ export default function AddRestaurantDetails() {
     }));
   };
 
+  const handleBack = (targetSection: Section) => {
+    handleSectionChange(targetSection);
+  };
+
   const handleSaveAndNext = async (currentSection: Section) => {
-    // Type as Section
     if (!state.session?.primary_email) {
       setState((prev) => ({
         ...prev,
@@ -152,8 +163,8 @@ export default function AddRestaurantDetails() {
       if (currentIndex < SECTIONS.length - 1) {
         setState((prev) => ({
           ...prev,
-          openSections: [SECTIONS[currentIndex + 1]],
-          completedSections: [...new Set([...prev.completedSections, currentSection])], // currentSection is now properly typed
+          currentSection: SECTIONS[currentIndex + 1],
+          completedSections: [...new Set([...prev.completedSections, currentSection])],
           error: null,
         }));
       }
@@ -219,15 +230,24 @@ export default function AddRestaurantDetails() {
           signing up.
         </p>
 
-        <Accordion type="single" value={state.openSections[0]} className="space-y-4">
+        <Accordion
+          type="single"
+          value={state.currentSection}
+          onValueChange={(value) => handleSectionChange(value as Section)}
+          collapsible
+          className="space-y-4"
+        >
           {SECTIONS.map((section) => (
             <AccordionSection
               key={section}
               section={section}
               formData={state.formData}
               isCompleted={state.completedSections.includes(section)}
+              isActive={state.currentSection === section}
+              currentSection={state.currentSection}
               onUpdate={handleFormUpdate}
               onSaveAndNext={() => handleSaveAndNext(section)}
+              onBack={handleBack}
               onSubmit={handleSubmit}
             />
           ))}

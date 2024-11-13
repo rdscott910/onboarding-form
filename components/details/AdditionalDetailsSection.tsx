@@ -10,10 +10,18 @@ interface AdditionalDetailsSectionProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onSwitchChange: (name: string) => (checked: boolean) => void;
   onNext: () => void;
+  onBack: () => void;
   isSaving: boolean;
 }
 
-export default function AdditionalDetailsSection({ formData, onChange, onSwitchChange, onNext, isSaving }: AdditionalDetailsSectionProps) {
+export default function AdditionalDetailsSection({
+  formData,
+  onChange,
+  onSwitchChange,
+  onNext,
+  onBack,
+  isSaving,
+}: AdditionalDetailsSectionProps) {
   return (
     <div className="space-y-4 mt-4">
       <div>
@@ -40,9 +48,14 @@ export default function AdditionalDetailsSection({ formData, onChange, onSwitchC
           disabled={isSaving}
         />
       </div>
-      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onNext} disabled={isSaving}>
-        {isSaving ? 'Saving...' : 'Next'}
-      </Button>
+      <div className="flex gap-4">
+        <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white" onClick={onBack} disabled={isSaving}>
+          Back
+        </Button>
+        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onNext} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Next'}
+        </Button>
+      </div>
     </div>
   );
 }

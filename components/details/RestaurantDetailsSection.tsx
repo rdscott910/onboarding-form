@@ -9,9 +9,10 @@ interface RestaurantDetailsSectionProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onNext: () => Promise<void>;
   isSaving: boolean;
+  isFirstSection: boolean;
 }
 
-export default function RestaurantDetailsSection({ formData, onChange, onNext, isSaving }: RestaurantDetailsSectionProps) {
+export default function RestaurantDetailsSection({ formData, onChange, onNext, isSaving, isFirstSection }: RestaurantDetailsSectionProps) {
   return (
     <div className="space-y-4 mt-4 w-full">
       <div className="grid grid-cols-2 gap-3 p-1">
@@ -75,9 +76,19 @@ export default function RestaurantDetailsSection({ formData, onChange, onNext, i
           />
         </div>
       </div>
-      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onNext} disabled={isSaving}>
-        {isSaving ? 'Saving...' : 'Next'}
-      </Button>
+
+      <div className="flex gap-4">
+        <Button
+          className="w-full bg-gray-700 hover:bg-gray-600 text-white"
+          disabled={isFirstSection || isSaving}
+          style={{ visibility: isFirstSection ? 'hidden' : 'visible' }}
+        >
+          Back
+        </Button>
+        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onNext} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Next'}
+        </Button>
+      </div>
     </div>
   );
 }

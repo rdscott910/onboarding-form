@@ -1,11 +1,15 @@
 'use client';
 
-import React, { useCallback, Suspense } from 'react';
+import React, { useCallback, Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckIcon, AlertTriangle } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
+import { Button } from '@/components/ui/button';
+import { getCsrfToken } from '@/lib/csrfToken';
+import { PartialServerStoreData } from '@/lib/types/types';
+import { type SessionData } from '@/lib/supabase-client';
 
 const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
@@ -81,26 +85,147 @@ const pricingPlans: PricingPlan[] = [
   },
 ];
 
+interface PageState {
+  isLoading: boolean;
+  error: string | null;
+  formData: PartialServerStoreData | null;
+  session: SessionData | null;
+}
+
 const Subscribe = () => {
-  const fetchClientSecret = useCallback(async () => {
-    // Create a Checkout Session
-    const res = await fetch('/api', {
-      method: 'POST',
-    });
-    const data = await res.json();
-    return data.clientSecret;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [state, setState] = useState<PageState>({
+    isLoading: true,
+    error: null,
+    formData: null,
+    session: null,
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const csrfToken = await getCsrfToken();
+        const response = await fetch('/api/get-form-data', {
+          headers: {
+            'X-CSRF-Token': csrfToken,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch subscription data');
+        }
+
+        const data = await response.json();
+
+        if (data.formData) {
+          const session =
+            data.formData.primary_email && data.registrationId
+              ? {
+                  primary_email: data.formData.primary_email,
+                  registrationId: data.registrationId,
+                }
+              : null;
+
+          setState((prev) => ({
+            ...prev,
+            formData: data.formData,
+            session,
+            isLoading: false,
+          }));
+        } else {
+          setState((prev) => ({
+            ...prev,
+            error: 'No subscription data found. Please select a plan first.',
+            isLoading: false,
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setState((prev) => ({
+          ...prev,
+          error: error instanceof Error ? error.message : 'An unexpected error occurred',
+          isLoading: false,
+        }));
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const options = { fetchClientSecret };
+  const fetchClientSecret = useCallback(async () => {
+    if (!state.session?.primary_email) {
+      throw new Error('Session data is missing');
+    }
 
-  const searchParams = useSearchParams();
-  const selectedPlanId = searchParams.get('plan') || 'smart';
-  const selectedPlan = pricingPlans.find((plan) => plan.id === selectedPlanId) || pricingPlans[0];
+    try {
+      const csrfToken = await getCsrfToken();
+      const response = await fetch('/api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken,
+        },
+        body: JSON.stringify({
+          primary_email: state.session.primary_email,
+          registrationId: state.session.registrationId,
+          selectedPlan: state.formData?.selectedPlan,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session');
+      }
+
+      const data = await response.json();
+      return data.clientSecret;
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      throw error;
+    }
+  }, [state.session, state.formData]);
+
+  if (state.isLoading) {
+    return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">Loading...</div>;
+  }
+
+  if (state.error) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Error</h2>
+          <p>{state.error}</p>
+          <Button className="mt-4" onClick={() => router.push('/pricing')}>
+            Go back to pricing
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!state.formData?.selectedPlan || !state.session) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">No Plan Selected</h2>
+          <p>Please select a plan before proceeding to checkout.</p>
+          <Button className="mt-4" onClick={() => router.push('/pricing')}>
+            Choose a plan
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedPlan = pricingPlans.find((plan) => plan.id === state.formData?.selectedPlan) || pricingPlans[0];
+
+  const options = { fetchClientSecret };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <h1 className="text-4xl font-bold text-center mb-12">Subscription Details</h1>
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Plan Summary Section */}
         <div className="bg-gray-800 rounded-lg p-6">
           <h2 className="text-2xl font-bold mb-2">
             {selectedPlan.title} <span className="text-cyan-400">{selectedPlan.price}</span>
@@ -116,91 +241,39 @@ const Subscribe = () => {
             ))}
           </ul>
           <Link href="/pricing">
-            <button className="w-full bg-white text-gray-900 py-2 px-4 rounded-md hover:bg-gray-200 transition-colors">Change plan</button>
+            <Button variant="secondary" className="w-full">
+              Change plan
+            </Button>
           </Link>
         </div>
+
+        {/* Checkout Section */}
         <div className="bg-gray-800 rounded-lg p-6">
-          {/* <h3 className="text-lg font-semibold mb-4">Card information</h3>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="card-number" className="block text-sm font-medium text-gray-400 mb-1">
-                Card number
-              </label>
-              <input type="text" id="card-number" className="w-full bg-gray-700 rounded-md p-2" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="expiry" className="block text-sm font-medium text-gray-400 mb-1">
-                  MM / YY
-                </label>
-                <input type="text" id="expiry" className="w-full bg-gray-700 rounded-md p-2" />
-              </div>
-              <div>
-                <label htmlFor="cvc" className="block text-sm font-medium text-gray-400 mb-1">
-                  CVC
-                </label>
-                <input type="text" id="cvc" className="w-full bg-gray-700 rounded-md p-2" />
-              </div>
-            </div>
-            <div>
-              <label htmlFor="country" className="block text-sm font-medium text-gray-400 mb-1">
-                Country or region
-              </label>
-              <select id="country" className="w-full bg-gray-700 rounded-md p-2">
-                <option>United States</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="zip" className="block text-sm font-medium text-gray-400 mb-1">
-                ZIP
-              </label>
-              <input type="text" id="zip" className="w-full bg-gray-700 rounded-md p-2" />
-            </div>
-          </div>
-          <h3 className="text-lg font-semibold mt-6 mb-4">Contact details</h3>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-400 mb-1">
-                First and last name
-              </label>
-              <input type="text" id="name" className="w-full bg-gray-700 rounded-md p-2" />
-            </div>
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-400 mb-1">
-                Phone number
-              </label>
-              <input type="tel" id="phone" className="w-full bg-gray-700 rounded-md p-2" />
-            </div>
-          </div>
-          <Link href="success">
-            <button className="w-full bg-blue-600 text-white py-2 px-4 rounded-md mt-6 hover:bg-blue-700 transition-colors">
-              Subscribe
-            </button>
-          </Link> */}
           <EmbeddedCheckoutProvider stripe={stripePromise} options={options}>
             <EmbeddedCheckout />
           </EmbeddedCheckoutProvider>
         </div>
       </div>
-      {selectedPlan.id === 'genius' ||
-        (selectedPlan.id === 'wise' && (
-          <div className="max-w-6xl mx-auto mt-8 bg-gray-800 bg-opacity-50 rounded-lg p-6">
-            <div className="flex items-start">
-              <AlertTriangle className="h-6 w-6 text-yellow-500 mr-2 mt-0.5" />
-              <div>
-                <h3 className="text-lg font-semibold text-yellow-500 mb-2">{selectedPlan.title} Requirements</h3>
-                <ul className="list-disc list-inside space-y-2 text-gray-300">
-                  <li>
-                    Update your Google Places with Virnika&apos;s number. (You don&apos;t need to change or forward your current number)
-                  </li>
-                  <li>Receiving weekly deposits for your revenue from call in orders on every Tuesday & Friday.</li>
-                  <li>Agreeing for Virnika to charge a service fee of a $1.00 to customers for to-go orders.</li>
-                  <li>Credit Card processing for to-go orders is 2.9% and 30 cents</li>
-                </ul>
-              </div>
+
+      {/* Plan Requirements Section */}
+      {(selectedPlan.id === 'genius' || selectedPlan.id === 'wise') && (
+        <div className="max-w-6xl mx-auto mt-8 bg-gray-800 bg-opacity-50 rounded-lg p-6">
+          <div className="flex items-start">
+            <AlertTriangle className="h-6 w-6 text-yellow-500 mr-2 mt-0.5" />
+            <div>
+              <h3 className="text-lg font-semibold text-yellow-500 mb-2">{selectedPlan.title} Requirements</h3>
+              <ul className="list-disc list-inside space-y-2 text-gray-300">
+                <li>
+                  Update your Google Places with Virnika&apos;s number. (You don&apos;t need to change or forward your current number)
+                </li>
+                <li>Receiving weekly deposits for your revenue from call in orders on every Tuesday & Friday.</li>
+                <li>Agreeing for Virnika to charge a service fee of a $1.00 to customers for to-go orders.</li>
+                <li>Credit Card processing for to-go orders is 2.9% and 30 cents</li>
+              </ul>
             </div>
           </div>
-        ))}
+        </div>
+      )}
     </div>
   );
 };

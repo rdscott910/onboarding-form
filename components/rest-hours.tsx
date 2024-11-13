@@ -11,7 +11,8 @@ interface RestHoursProps {
   hours: RestaurantHours[];
   onChange: (hours: RestaurantHours[]) => void;
   onNext: () => Promise<void>;
-  isSaving?: boolean;
+  onBack: () => void;
+  isSaving: boolean;
 }
 
 interface TimeInputProps {
@@ -92,11 +93,17 @@ const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange, disabled }) =
     onChange(newHours);
   };
 
+  // Convert string dates to Date objects
+  const parsedHours = hours.map((hour) => ({
+    start: hour.start instanceof Date ? hour.start : new Date(hour.start),
+    end: hour.end instanceof Date ? hour.end : new Date(hour.end),
+  }));
+
   return (
     <div className="flex items-center space-x-4 py-2 border-b border-gray-700">
       <div className="w-28 text-gray-300">{WeekDay[day]}</div>
       <div className="flex-grow">
-        {hours.map((hour, index) => (
+        {parsedHours.map((hour, index) => (
           <HoursPair
             key={index}
             openTime={hour.start.toTimeString().slice(0, 5)}
@@ -134,17 +141,41 @@ const DayHours: React.FC<DayHoursProps> = ({ day, hours, onChange, disabled }) =
 
 const WEEKDAYS = Array.from({ length: 7 }, (_, i) => i) as WeekDay[];
 
-const RestHours: React.FC<RestHoursProps> = ({ hours, onChange, onNext, isSaving = false }) => {
+const RestHours: React.FC<RestHoursProps> = ({ hours, onChange, onNext, onBack, isSaving = false }) => {
   const updateHours = (day: WeekDay, newHours: TstzRange[]) => {
     const updatedHours = [...hours];
     const existingDayIndex = updatedHours.findIndex((h) => h.day_of_week === day);
+
+    // Ensure the hours are Date objects
+    const parsedNewHours = newHours.map((hour) => ({
+      start: hour.start instanceof Date ? hour.start : new Date(hour.start),
+      end: hour.end instanceof Date ? hour.end : new Date(hour.end),
+    }));
+
     if (existingDayIndex !== -1) {
-      updatedHours[existingDayIndex] = { ...updatedHours[existingDayIndex], hours: newHours };
+      updatedHours[existingDayIndex] = {
+        ...updatedHours[existingDayIndex],
+        hours: parsedNewHours,
+      };
     } else {
-      updatedHours.push({ day_of_week: day, hours: newHours, timezone: 'UTC' } as RestaurantHours);
+      updatedHours.push({
+        day_of_week: day,
+        hours: parsedNewHours,
+        timezone: 'UTC',
+      } as RestaurantHours);
     }
+
     onChange(updatedHours);
   };
+
+  // Ensure initial hours are properly parsed
+  const parsedInitialHours = hours.map((dayHours) => ({
+    ...dayHours,
+    hours: dayHours.hours.map((hour) => ({
+      start: hour.start instanceof Date ? hour.start : new Date(hour.start),
+      end: hour.end instanceof Date ? hour.end : new Date(hour.end),
+    })),
+  }));
 
   return (
     <div className="w-full max-w-3xl mx-auto bg-gray-800 text-white p-6 rounded-lg shadow-lg">
@@ -152,12 +183,15 @@ const RestHours: React.FC<RestHoursProps> = ({ hours, onChange, onNext, isSaving
         <DayHours
           key={day}
           day={day}
-          hours={hours.find((h) => h.day_of_week === day)?.hours || []}
+          hours={parsedInitialHours.find((h) => h.day_of_week === day)?.hours || []}
           onChange={(newHours) => updateHours(day, newHours)}
           disabled={isSaving}
         />
       ))}
-      <div className="mt-6">
+      <div className="mt-6 flex gap-4">
+        <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white disabled:opacity-50" onClick={onBack} disabled={isSaving}>
+          Back
+        </Button>
         <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" onClick={onNext} disabled={isSaving}>
           {isSaving ? 'Saving...' : 'Next'}
         </Button>

@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Accordion } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
-import { PartialServerStoreData, GetFormDataResponse } from '@/lib/types/types';
-import { getCsrfToken } from '@/lib/csrfToken';
-import { updateRegistrationData } from '@/lib/supabase-client';
+import { PartialServerStoreData } from '@/lib/types/types';
+import { useAuth } from '@/app/providers/AuthProvider';
+import { supabaseClient } from '@/lib/supabase-client';
+import { useForm } from '@/components/providers/FormProvider';
+import { getRegistrationData } from '@/lib/supabase-client';
 import AccordionSection from '@/components/details/AccordionSection';
-
-import { type SessionData } from '@/lib/supabase-client';
+import type { Database } from '@/lib/types/supabase';
 
 const INITIAL_FORM_DATA: PartialServerStoreData = {
   name: '',
@@ -43,212 +44,125 @@ interface PageState {
   error: string | null;
   currentSection: Section;
   completedSections: Section[];
-  formData: PartialServerStoreData;
-  session: SessionData | null;
 }
 
 export default function AddRestaurantDetails() {
   const router = useRouter();
-  const [state, setState] = useState<PageState>({
+  const { user } = useAuth();
+  const { formData, updateFormData, saveFormData, isLoading: isSaving } = useForm();
+
+  const [pageState, setPageState] = useState<PageState>({
     isLoading: true,
     error: null,
-    currentSection: 'restaurant-details',
+    currentSection: SECTIONS[0],
     completedSections: [],
-    formData: INITIAL_FORM_DATA,
-    session: null,
   });
 
-  // Fetch initial data
   useEffect(() => {
-    const fetchFormData = async () => {
+    const loadFormData = async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+
+      if (!session?.user.email) {
+        router.push('/');
+        return;
+      }
+
       try {
-        const csrfToken = await getCsrfToken();
-        const response = await fetch('/api/get-form-data', {
-          headers: { 'X-CSRF-Token': csrfToken },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch form data');
-        }
-
-        const data: GetFormDataResponse = await response.json();
-
-        if (data.formData) {
-          // Extract session data if available
-          const session =
-            data.formData.primary_email && data.registrationId
-              ? {
-                  primary_email: data.formData.primary_email,
-                  registrationId: data.registrationId,
-                }
-              : null;
-
-          // Calculate completed sections
-          const completed = getCompletedSections(data.formData);
-
-          setState((prev) => ({
-            ...prev,
-            formData: {
-              ...INITIAL_FORM_DATA,
-              ...data.formData,
-            },
-            session,
-            completedSections: completed,
-            isLoading: false,
-          }));
-        } else {
-          setState((prev) => ({ ...prev, isLoading: false }));
+        const data = await getRegistrationData(session.user.email);
+        if (data) {
+          updateFormData(data);
+          // Update completed sections based on data
+          const completed = SECTIONS.filter(section => {
+            switch (section) {
+              case 'restaurant-details':
+                return !!data.name && !!data.street_address;
+              case 'hours':
+                return data.restaurant_hours && data.restaurant_hours.length > 0;
+              case 'restaurant-menu':
+                return !!data.ordering_url;
+              case 'additional-details':
+                return !!data.history_and_story;
+              case 'banking-information':
+                return !!data.banking_info?.routing_number && !!data.banking_info?.account_number;
+              default:
+                return false;
+            }
+          });
+          setPageState(prev => ({ ...prev, completedSections: completed }));
         }
       } catch (error) {
-        setState((prev) => ({
+        console.error('Error loading form data:', error);
+        setPageState(prev => ({
           ...prev,
-          error: 'An error occurred while retrieving your data. Please try again.',
-          isLoading: false,
+          error: error instanceof Error ? error.message : 'Failed to load form data',
         }));
+      } finally {
+        setPageState(prev => ({ ...prev, isLoading: false }));
       }
     };
 
-    fetchFormData();
-  }, []);
+    loadFormData();
+  }, [user, router, updateFormData]);
 
-  // Helper function to determine completed sections - now explicitly returns Section[]
-  const getCompletedSections = (formData: PartialServerStoreData): Section[] => {
-    return SECTIONS.filter((section) => {
-      const sectionFields = Object.entries(formData)
-        .filter(([key]) => key.includes(section.replace('-', '_')))
-        .map(([_, value]) => value);
-
-      return sectionFields.some((value) => value && (typeof value === 'object' ? Object.keys(value).length > 0 : true));
-    });
-  };
-
-  const handleSectionChange = (section: Section) => {
-    setState((prev) => ({
-      ...prev,
-      currentSection: section,
-    }));
-  };
-
-  const handleFormUpdate = (updates: Partial<PartialServerStoreData>) => {
-    setState((prev) => ({
-      ...prev,
-      formData: {
-        ...prev.formData,
-        ...updates,
-      },
-    }));
-  };
-
-  const handleBack = (targetSection: Section) => {
-    handleSectionChange(targetSection);
-  };
-
-  const handleSaveAndNext = async (currentSection: Section) => {
-    if (!state.session?.primary_email) {
-      setState((prev) => ({
+  const handleSectionComplete = async (section: Section) => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    
+    if (!session) {
+      setPageState(prev => ({
         ...prev,
-        error: 'Session data is missing. Please try again.',
+        error: 'Your session has expired. Please sign in again.',
       }));
+      router.push('/');
       return;
     }
 
     try {
-      const success = await updateRegistrationData(state.session.primary_email, state.formData);
-
-      if (!success) {
-        throw new Error('Failed to update registration data');
-      }
-
-      const currentIndex = SECTIONS.indexOf(currentSection);
-      if (currentIndex < SECTIONS.length - 1) {
-        setState((prev) => ({
+      const success = await saveFormData();
+      if (success) {
+        setPageState(prev => ({
           ...prev,
-          currentSection: SECTIONS[currentIndex + 1],
-          completedSections: [...new Set([...prev.completedSections, currentSection])],
-          error: null,
+          completedSections: [...prev.completedSections, section],
+          currentSection: SECTIONS[SECTIONS.indexOf(section) + 1],
         }));
       }
     } catch (error) {
-      setState((prev) => ({
+      console.error('Error saving section:', error);
+      setPageState(prev => ({
         ...prev,
-        error: error instanceof Error ? error.message : 'Failed to save changes',
+        error: error instanceof Error ? error.message : 'Failed to save section',
       }));
     }
   };
 
-  const handleSubmit = async () => {
-    try {
-      if (!state.session?.primary_email) {
-        throw new Error('Session data is missing');
-      }
-
-      const success = await updateRegistrationData(state.session.primary_email, state.formData);
-
-      if (!success) {
-        throw new Error('Failed to update registration data');
-      }
-
-      router.push('/pricing');
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to save changes',
-      }));
-    }
-  };
-
-  if (state.isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
-        </div>
-      </div>
-    );
-  }
-
-  if (state.error) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Error</h1>
-          <p>{state.error}</p>
-          <Button className="mt-4" onClick={() => router.push('/')}>
-            Go back to home
-          </Button>
-        </div>
-      </div>
-    );
+  if (pageState.isLoading) {
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold text-center mb-2">Add restaurant details</h1>
-        <p className="text-center text-gray-400 mb-8">
-          Want to add multiple restaurants? Create an account for your first location and you can quickly create more locations after
-          signing up.
-        </p>
+    <div className="min-h-screen bg-gray-900 py-8 px-4 text-white">
+      <div className="max-w-3xl mx-auto space-y-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">Restaurant Details</h1>
+          <p className="text-gray-400 mt-2">Please fill out the following information about your restaurant</p>
+        </div>
 
-        <Accordion
-          type="single"
-          value={state.currentSection}
-          onValueChange={(value) => handleSectionChange(value as Section)}
-          collapsible
-          className="space-y-4"
-        >
+        {pageState.error && (
+          <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-2 rounded">
+            {pageState.error}
+          </div>
+        )}
+
+        <Accordion type="single" collapsible defaultValue={pageState.currentSection}>
           {SECTIONS.map((section) => (
             <AccordionSection
               key={section}
               section={section}
-              formData={state.formData}
-              isCompleted={state.completedSections.includes(section)}
-              isActive={state.currentSection === section}
-              currentSection={state.currentSection}
-              onUpdate={handleFormUpdate}
-              onSaveAndNext={() => handleSaveAndNext(section)}
-              onBack={handleBack}
-              onSubmit={handleSubmit}
+              isCompleted={pageState.completedSections.includes(section)}
+              isCurrent={pageState.currentSection === section}
+              onComplete={() => handleSectionComplete(section)}
+              formData={formData}
+              onUpdateFormData={updateFormData}
+              isLoading={isSaving}
             />
           ))}
         </Accordion>

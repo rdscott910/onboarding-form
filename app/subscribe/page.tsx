@@ -7,9 +7,11 @@ import { CheckIcon, AlertTriangle } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
-import { getCsrfToken } from '@/lib/csrfToken';
 import { PartialServerStoreData } from '@/lib/types/types';
-import { type SessionData } from '@/lib/supabase-client';
+import { useAuth } from '@/app/providers/AuthProvider';
+import type { Database } from '@/lib/types/supabase';
+import { supabaseClient } from '@/lib/supabase-client';
+import { getRegistrationData } from '@/lib/supabase-client';
 
 const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
@@ -89,60 +91,74 @@ interface PageState {
   isLoading: boolean;
   error: string | null;
   formData: PartialServerStoreData | null;
-  session: SessionData | null;
+  clientSecret: string | null;
 }
 
-const Subscribe = () => {
+function Subscribe() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const { user } = useAuth();
   const [state, setState] = useState<PageState>({
     isLoading: true,
     error: null,
     formData: null,
-    session: null,
+    clientSecret: null,
   });
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchFormData = async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      
+      if (!session?.user.email) {
+        setState(prev => ({
+          ...prev,
+          error: 'Authentication required',
+          isLoading: false,
+        }));
+        return;
+      }
+
       try {
-        const csrfToken = await getCsrfToken();
-        const response = await fetch('/api/get-form-data', {
-          headers: {
-            'X-CSRF-Token': csrfToken,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch subscription data');
-        }
-
-        const data = await response.json();
-
-        if (data.formData) {
-          const session =
-            data.formData.primary_email && data.registrationId
-              ? {
-                  primary_email: data.formData.primary_email,
-                  registrationId: data.registrationId,
-                }
-              : null;
-
-          setState((prev) => ({
+        const data = await getRegistrationData(session.user.email);
+        if (data) {
+          setState(prev => ({
             ...prev,
-            formData: data.formData,
-            session,
+            formData: data,
             isLoading: false,
           }));
+
+          // If it's a paid plan, create a Stripe checkout session
+          if (data.selectedPlan !== 'smart') {
+            const stripeResponse = await fetch('/api/stripe', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                priceId: data.selectedPlan,
+                email: session.user.email,
+              }),
+            });
+
+            if (!stripeResponse.ok) {
+              throw new Error('Failed to create checkout session');
+            }
+
+            const stripeData = await stripeResponse.json();
+            setState(prev => ({
+              ...prev,
+              clientSecret: stripeData.clientSecret,
+            }));
+          }
         } else {
-          setState((prev) => ({
+          setState(prev => ({
             ...prev,
-            error: 'No subscription data found. Please select a plan first.',
+            error: 'No form data found. Please complete the previous steps first.',
             isLoading: false,
           }));
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        setState((prev) => ({
+        setState(prev => ({
           ...prev,
           error: error instanceof Error ? error.message : 'An unexpected error occurred',
           isLoading: false,
@@ -150,43 +166,25 @@ const Subscribe = () => {
       }
     };
 
-    fetchData();
-  }, []);
-
-  const fetchClientSecret = useCallback(async () => {
-    if (!state.session?.primary_email) {
-      throw new Error('Session data is missing');
-    }
-
-    try {
-      const csrfToken = await getCsrfToken();
-      const response = await fetch('/api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfToken,
-        },
-        body: JSON.stringify({
-          primary_email: state.session.primary_email,
-          registrationId: state.session.registrationId,
-          selectedPlan: state.formData?.selectedPlan,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create checkout session');
-      }
-
-      const data = await response.json();
-      return data.clientSecret;
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-      throw error;
-    }
-  }, [state.session, state.formData]);
+    fetchFormData();
+  }, [supabaseClient]);
 
   if (state.isLoading) {
     return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Authentication Required</h2>
+          <p>Please sign in to access subscription details.</p>
+          <Button className="mt-4" onClick={() => router.push('/')}>
+            Go to Sign In
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (state.error) {
@@ -203,15 +201,28 @@ const Subscribe = () => {
     );
   }
 
-  if (!state.formData?.selectedPlan || !state.session) {
+  if (!state.formData) {
     return (
       <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">No Plan Selected</h2>
-          <p>Please select a plan before proceeding to checkout.</p>
+          <p>Please select a plan first.</p>
           <Button className="mt-4" onClick={() => router.push('/pricing')}>
-            Choose a plan
+            Go to pricing
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // For free plan
+  if (state.formData.selectedPlan === 'smart') {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-4xl font-bold mb-8">Welcome to Smart Plan!</h1>
+          <p className="text-xl mb-8">You&apos;ve successfully signed up for our free plan.</p>
+          <Button onClick={() => router.push('/success')}>Continue to Dashboard</Button>
         </div>
       </div>
     );
@@ -219,8 +230,7 @@ const Subscribe = () => {
 
   const selectedPlan = pricingPlans.find((plan) => plan.id === state.formData?.selectedPlan) || pricingPlans[0];
 
-  const options = { fetchClientSecret };
-
+  // For paid plans
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <h1 className="text-4xl font-bold text-center mb-12">Subscription Details</h1>
@@ -249,9 +259,15 @@ const Subscribe = () => {
 
         {/* Checkout Section */}
         <div className="bg-gray-800 rounded-lg p-6">
-          <EmbeddedCheckoutProvider stripe={stripePromise} options={options}>
-            <EmbeddedCheckout />
-          </EmbeddedCheckoutProvider>
+          {state.clientSecret ? (
+            <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret: state.clientSecret }}>
+              <EmbeddedCheckout />
+            </EmbeddedCheckoutProvider>
+          ) : (
+            <div className="text-center">
+              <p className="text-xl mb-4">Processing payment details...</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -276,12 +292,14 @@ const Subscribe = () => {
       )}
     </div>
   );
-};
+}
 
-const SubscribePage = () => (
-  <Suspense fallback="Loading...">
-    <Subscribe />
-  </Suspense>
-);
+function SubscribePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <Subscribe />
+    </Suspense>
+  );
+}
 
 export default SubscribePage;

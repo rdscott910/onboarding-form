@@ -1,28 +1,47 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { authMiddleware } from '@/app/middleware/auth';
-import { csrfMiddleware } from '@/app/middleware/csrf';
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
+import { NextResponse, type NextRequest } from 'next/server';
 import { loggingMiddleware } from '@/app/middleware/logging';
 
 export async function middleware(req: NextRequest) {
-  // Skip auth for public endpoints
-  const publicPaths = ['/api/csrf', '/api/save-form-data'];
-  const isPublicPath = publicPaths.some((path) => req.nextUrl.pathname.startsWith(path));
+  const res = NextResponse.next();
 
-  const response = await loggingMiddleware(req);
-  if (response) return response;
+  // Create Supabase client for auth
+  const supabase = createMiddlewareClient({ req, res });
 
-  const csrfResponse = await csrfMiddleware(req);
-  if (csrfResponse) return csrfResponse;
+  // Apply logging middleware
+  const loggingResponse = await loggingMiddleware(req);
+  if (loggingResponse) return loggingResponse;
 
-  // Only apply auth middleware for protected routes
-  if (!isPublicPath) {
-    const authResponse = await authMiddleware(req);
-    if (authResponse) return authResponse;
+  // Skip auth check for callback route
+  if (req.nextUrl.pathname.startsWith('/auth/callback')) {
+    return res;
   }
 
-  return NextResponse.next();
+  // Refresh session if it exists
+  const { data: { session } } = await supabase.auth.getSession();
+
+  // Protect routes that require authentication
+  const protectedPaths = ['/details', '/pricing', '/subscribe'];
+  const path = req.nextUrl.pathname;
+
+  if (protectedPaths.some(prefix => path.startsWith(prefix))) {
+    if (!session) {
+      return NextResponse.redirect(new URL('/', req.url));
+    }
+  }
+
+  return res;
 }
 
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
+  ],
 };

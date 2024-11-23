@@ -110,9 +110,6 @@ export interface ServerStoreData extends PartialLocationData {
   primary_email?: string;
 }
 
-export interface ExtendedPartialServerStoreData extends PartialServerStoreData {
-  request_type: 'updateRestaurantDetails' | 'submitRootForm';
-}
 
 export interface PartialServerStoreData extends Partial<ServerStoreData> {
   registrationId?: string;

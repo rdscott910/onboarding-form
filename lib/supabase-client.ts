@@ -1,100 +1,68 @@
 import { createClient } from '@supabase/supabase-js';
 import { FullLocationData, RestaurantHours, PartialServerStoreData, AnonymousRegistration } from '@/lib/types/types';
-import { SessionData } from '@/lib/types/session';
 import { Database } from '@/lib/types/supabase';
 
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Supabase URL and Key must be provided');
-}
-const supabaseClient = createClient<Database>(supabaseUrl, supabaseKey);
-
-export async function getSession(): Promise<SessionData | null> {
-  try {
-    const response = await fetch('/api/session', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) return null;
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching session:', error);
-    return null;
-  }
+  throw new Error('Missing environment variables for Supabase configuration');
 }
 
-export async function createSession(email: string, data?: any): Promise<SessionData | null> {
-  try {
-    const response = await fetch('/api/session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, data }),
-    });
+// Enhanced client configuration with proper auth settings
+export const supabaseClient = createClient<Database>(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: true, // Ensures token stays valid
+    persistSession: true, // Maintains session across page reloads
+    detectSessionInUrl: false, // Disable URL detection since we're not using redirects
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-js', // Helps with debugging and tracking
+    },
+  },
+});
 
-    if (!response.ok) return null;
-    return await response.json();
-  } catch (error) {
-    console.error('Error creating session:', error);
-    return null;
-  }
-}
-
-export async function getOrCreateRegistration(primary_email: string, initialData?: PartialServerStoreData): Promise<SessionData | null> {
+export async function getOrCreateRegistration(
+  primary_email: string,
+  initialData?: PartialServerStoreData
+): Promise<AnonymousRegistration | null> {
   try {
-    // First, try to get existing registration
-    const { data: existingRegistration, error: fetchError } = await supabaseClient
+    // Check for valid auth session before database operations
+    const session = await supabaseClient.auth.getSession();
+    if (!session.data.session) {
+      console.error('No auth session found');
+      return null;
+    }
+
+    // Try to fetch existing registration
+    const { data, error: fetchError } = await supabaseClient
       .from('anonymous_registrations')
-      .select('*')
+      .select()
       .eq('primary_email', primary_email)
       .single();
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      // PGRST116 is "not found"
-      throw fetchError;
-    }
-
-    if (existingRegistration) {
-      return {
-        primary_email: existingRegistration.primary_email,
-        registrationId: existingRegistration.id,
-      };
-    }
-
-    if (initialData) {
-      // Create new registration if it doesn't exist
-      const { data: newRegistration, error: insertError } = await supabaseClient
+    // Handle case where registration doesn't exist
+    if (fetchError && fetchError.code === 'PGRST116') {
+      // Create new registration and return full record
+      const { data: newReg, error: insertError } = await supabaseClient
         .from('anonymous_registrations')
-        .insert([
-          {
-            primary_email,
-            registration_data: {
-              ...initialData,
-              primary_email,
-            },
-          },
-        ])
+        .insert({
+          primary_email,
+          registration_data: initialData,
+        })
         .select()
         .single();
 
       if (insertError) throw insertError;
-
-      if (newRegistration) {
-        return {
-          primary_email: newRegistration.primary_email,
-          registrationId: newRegistration.id,
-        };
-      }
+      return newReg;
     }
 
-    return null;
+    // Re-throw any other errors for proper handling
+    if (fetchError) throw fetchError;
+    return data;
   } catch (error) {
-    console.error('Error in getOrCreateRegistration:', error);
+    console.error('Registration error:', error);
     return null;
   }
 }
@@ -200,19 +168,19 @@ function deepCleanUndefined<T>(obj: T): T {
   return obj;
 }
 
-// Type guard for checking if an unknown value matches AnonymousRegistration
-function isAnonymousRegistration(obj: unknown): obj is AnonymousRegistration {
+/**
+ * Type guard for checking if an unknown value matches AnonymousRegistration
+ */
+export function isAnonymousRegistration(obj: unknown): obj is AnonymousRegistration {
   if (!obj || typeof obj !== 'object') return false;
 
   const registration = obj as AnonymousRegistration;
   return (
     typeof registration.id === 'string' &&
-    typeof registration.primary_email === 'string' &&
     typeof registration.created_at === 'string' &&
+    typeof registration.primary_email === 'string' &&
+    typeof registration.registration_data === 'object' &&
     typeof registration.completed === 'boolean' &&
-    typeof registration.last_modified === 'string' &&
-    registration.registration_data !== undefined
+    typeof registration.last_modified === 'string'
   );
 }
-
-export type { SessionData };

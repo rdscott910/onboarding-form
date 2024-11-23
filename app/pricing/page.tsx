@@ -3,10 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import { CheckIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getCsrfToken } from '@/lib/csrfToken';
 import { PartialServerStoreData } from '@/lib/types/types';
 import { Button } from '@/components/ui/button';
-import { type SessionData } from '@/lib/supabase-client';
+import { useAuth } from '@/app/providers/AuthProvider';
+import { supabaseClient } from '@/lib/supabase-client';
+import { getRegistrationData } from '@/lib/supabase-client';
+import type { Database } from '@/lib/types/supabase';
 
 interface PlanFeature {
   name: string;
@@ -25,10 +27,9 @@ interface PageState {
   isLoading: boolean;
   error: string | null;
   formData: PartialServerStoreData | null;
-  session: SessionData | null;
 }
 
-const pricingPlans: PricingPlan[] = [
+const PRICING_PLANS: PricingPlan[] = [
   {
     id: 'smart',
     title: 'Smart Plan',
@@ -83,55 +84,44 @@ const pricingPlans: PricingPlan[] = [
 
 export default function PricingPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [state, setState] = useState<PageState>({
     isLoading: true,
     error: null,
     formData: null,
-    session: null,
   });
 
   useEffect(() => {
     const fetchFormData = async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      
+      if (!session?.user.email) {
+        setState(prev => ({
+          ...prev,
+          error: 'Authentication required',
+          isLoading: false,
+        }));
+        return;
+      }
+
       try {
-        const csrfToken = await getCsrfToken();
-        const response = await fetch('/api/get-form-data', {
-          headers: {
-            'X-CSRF-Token': csrfToken,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch form data');
-        }
-
-        const data = await response.json();
-
-        if (data.formData) {
-          // Extract session data if available
-          const session =
-            data.formData.primary_email && data.registrationId
-              ? {
-                  primary_email: data.formData.primary_email,
-                  registrationId: data.registrationId,
-                }
-              : null;
-
-          setState((prev) => ({
+        const data = await getRegistrationData(session.user.email);
+        if (data) {
+          setState(prev => ({
             ...prev,
-            formData: data.formData,
-            session,
+            formData: data,
             isLoading: false,
           }));
         } else {
-          setState((prev) => ({
+          setState(prev => ({
             ...prev,
             error: 'No form data found. Please complete the previous steps first.',
             isLoading: false,
           }));
         }
       } catch (error) {
-        console.error('Error fetching form data:', error);
-        setState((prev) => ({
+        console.error('Error fetching data:', error);
+        setState(prev => ({
           ...prev,
           error: error instanceof Error ? error.message : 'An unexpected error occurred',
           isLoading: false,
@@ -139,35 +129,29 @@ export default function PricingPage() {
       }
     };
 
-    fetchFormData();
-  }, []);
+    if (!authLoading) {
+      fetchFormData();
+    }
+  }, [authLoading]);
 
-  if (state.isLoading) {
+  if (authLoading || state.isLoading) {
     return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!user) {
+    router.push('/');
+    return null;
   }
 
   if (state.error) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Error</h2>
-          <p>{state.error}</p>
-          <Button className="mt-4" onClick={() => router.push('/details')}>
-            Go back to details page
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!state.formData || !state.session) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">No Data Found</h2>
-          <p>We couldn&apos;t find your previous details. Please go back and fill them in.</p>
-          <Button className="mt-4" onClick={() => router.push('/details')}>
-            Go to details page
+      <div className="min-h-screen bg-gray-900 text-white p-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 mb-8">
+            <p className="text-red-300">{state.error}</p>
+          </div>
+          <Button onClick={() => router.push('/details')}>
+            Go Back to Details
           </Button>
         </div>
       </div>
@@ -176,11 +160,17 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
-      <h1 className="text-4xl font-bold text-center mb-12">Pick your plan</h1>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
-        {pricingPlans.map((plan) => (
-          <PricingCard key={plan.id} plan={plan} formData={state.formData} session={state.session} />
-        ))}
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-4xl font-bold mb-12 text-center">Choose Your Plan</h1>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {PRICING_PLANS.map((plan) => (
+            <PricingCard
+              key={plan.id}
+              plan={plan}
+              formData={state.formData || {}}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -188,37 +178,41 @@ export default function PricingPage() {
 
 interface PricingCardProps {
   plan: PricingPlan;
-  formData: PartialServerStoreData | null;
-  session: SessionData | null;
+  formData: PartialServerStoreData;
 }
 
-function PricingCard({ plan, formData, session }: PricingCardProps) {
+function PricingCard({ plan, formData }: PricingCardProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleChoosePlan = async () => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    
+    if (!session?.user.email) {
+      setError('Your session has expired. Please sign in again.');
+      router.push('/');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      const csrfToken = await getCsrfToken();
       const response = await fetch('/api/save-form-data', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfToken,
         },
         body: JSON.stringify({
           ...formData,
           selectedPlan: plan.id,
-          primary_email: session?.primary_email,
-          registrationId: session?.registrationId,
+          primary_email: session.user.email,
         }),
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.message || 'Failed to save plan selection');
       }

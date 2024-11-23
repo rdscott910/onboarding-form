@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import type { Database } from '@/lib/types/supabase';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
@@ -28,25 +31,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 }
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
-  const { searchParams } = new URL(req.url);
-  const sessionId = searchParams.get('session_id');
-
-  if (!sessionId) {
-    return NextResponse.json({ error: 'Missing session_id' }, { status: 400 });
-  }
-
+export async function GET(request: NextRequest) {
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
 
     return NextResponse.json({
-      status: session.status,
-      customer_email: session.customer_details?.email,
+      authenticated: !!session,
+      user: session?.user || null,
     });
-  } catch (err) {
-    if (err instanceof Stripe.errors.StripeError) {
-      return NextResponse.json({ error: err.message }, { status: err.statusCode });
-    }
-    return NextResponse.json({ error: 'An unknown error occurred' }, { status: 500 });
+  } catch (error) {
+    console.error('Error in root API route:', error);
+    return NextResponse.json({ success: false, message: 'Internal server error' }, { status: 500 });
   }
 }

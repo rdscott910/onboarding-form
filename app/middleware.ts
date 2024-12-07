@@ -18,13 +18,15 @@ export async function middleware(req: NextRequest) {
   }
 
   // Refresh session if it exists
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   // Protect routes that require authentication
   const protectedPaths = ['/details', '/pricing', '/subscribe'];
   const path = req.nextUrl.pathname;
 
-  if (protectedPaths.some(prefix => path.startsWith(prefix))) {
+  if (protectedPaths.some((prefix) => path.startsWith(prefix))) {
     if (!session) {
       return NextResponse.redirect(new URL('/', req.url));
     }

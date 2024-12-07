@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { supabaseAuthMiddleware } from '@/app/middleware/supabase-auth';
+import { authMiddleware } from '@/app/middleware/auth';
 import { loggingMiddleware } from '@/app/middleware/logging';
 
 export async function middleware(request: NextRequest) {
@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
   await loggingMiddleware(request);
 
   // Apply Supabase auth middleware
-  const response = await supabaseAuthMiddleware(request);
+  const response = await authMiddleware(request);
 
   // Return the response
   return response;

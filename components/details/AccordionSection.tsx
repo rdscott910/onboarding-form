@@ -5,10 +5,9 @@ import { PartialServerStoreData, RestaurantHours } from '@/lib/types/types';
 import RestaurantDetailsSection from './RestaurantDetailsSection';
 import RestaurantMenuSection from './RestaurantMenuSection';
 import AdditionalDetailsSection from './AdditionalDetailsSection';
-import BankingInformationSection from './BankingInformationSection';
-import RestHours from '@/components/rest-hours';
-
-type Section = 'restaurant-details' | 'hours' | 'restaurant-menu' | 'additional-details' | 'banking-information';
+import RestHours from '@/components/details/rest-hours';
+import { cn } from '@/lib/utils';
+import { Section } from '@/app/details/page';
 
 interface AccordionSectionProps {
   section: Section;
@@ -22,32 +21,12 @@ interface AccordionSectionProps {
   onSubmit: () => Promise<void>;
 }
 
-export function AccordionSection({
-  section,
-  formData,
-  isCompleted,
-  isActive,
-  currentSection,
-  onUpdate,
-  onSaveAndNext,
-  onBack,
-  onSubmit,
-}: AccordionSectionProps) {
+export function AccordionSection({ section, formData, isCompleted, isActive, onUpdate, onSaveAndNext, onBack }: AccordionSectionProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     onUpdate({ [name]: value });
-  };
-
-  const handleBankingInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    onUpdate({
-      banking_info: {
-        ...formData.banking_info,
-        [name]: value,
-      },
-    });
   };
 
   const handleSwitchChange = (name: string) => (checked: boolean) => {
@@ -67,24 +46,9 @@ export function AccordionSection({
     }
   };
 
-  const handleSubmit = async () => {
-    setIsSaving(true);
-    try {
-      await onSubmit();
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const getPreviousSection = (current: Section): Section | null => {
-    const sections: Section[] = ['restaurant-details', 'hours', 'restaurant-menu', 'additional-details', 'banking-information'];
-    const currentIndex = sections.indexOf(current);
-    return currentIndex > 0 ? sections[currentIndex - 1] : null;
-  };
-
   return (
     <AccordionItem value={section}>
-      <AccordionTrigger className="flex items-center justify-between py-4 w-full border-[#2E2E2E]">
+      <AccordionTrigger className={cn('flex items-center justify-between py-4 w-full border-[#2E2E2E]', !isActive && 'opacity-50')}>
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center">
             <div
@@ -108,7 +72,7 @@ export function AccordionSection({
           <RestaurantDetailsSection
             formData={formData}
             onChange={handleInputChange}
-            onNext={handleNext}
+            onNext={() => onSaveAndNext(section)}
             isSaving={isSaving}
             isFirstSection={true}
           />
@@ -138,16 +102,6 @@ export function AccordionSection({
             onSwitchChange={handleSwitchChange}
             onNext={handleNext}
             onBack={() => onBack('restaurant-menu')}
-            isSaving={isSaving}
-          />
-        )}
-        {section === 'banking-information' && (
-          <BankingInformationSection
-            formData={formData}
-            onChange={handleInputChange}
-            onBankingInfoChange={handleBankingInfoChange}
-            onSubmit={handleSubmit}
-            onBack={() => onBack('additional-details')}
             isSaving={isSaving}
           />
         )}

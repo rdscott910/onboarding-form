@@ -3,13 +3,23 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Accordion } from '@/components/ui/accordion';
-import { Button } from '@/components/ui/button';
 import { PartialServerStoreData } from '@/lib/types/types';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { supabaseClient } from '@/lib/supabase-client';
 import { useForm } from '@/components/providers/FormProvider';
 import { getRegistrationData } from '@/lib/supabase-client';
 import AccordionSection from '@/components/details/AccordionSection';
+
+export type Section = 'restaurant-details' | 'hours' | 'restaurant-menu' | 'additional-details';
+
+const SECTIONS: Section[] = ['restaurant-details', 'hours', 'restaurant-menu', 'additional-details'];
+
+interface PageState {
+  isLoading: boolean;
+  error: string | null;
+  currentSection: Section;
+  completedSections: Section[];
+}
 
 const INITIAL_FORM_DATA: PartialServerStoreData = {
   name: '',
@@ -34,21 +44,10 @@ const INITIAL_FORM_DATA: PartialServerStoreData = {
   },
 };
 
-type Section = 'restaurant-details' | 'hours' | 'restaurant-menu' | 'additional-details' | 'banking-information';
-
-const SECTIONS: Section[] = ['restaurant-details', 'hours', 'restaurant-menu', 'additional-details', 'banking-information'];
-
-interface PageState {
-  isLoading: boolean;
-  error: string | null;
-  currentSection: Section;
-  completedSections: Section[];
-}
-
 export default function AddRestaurantDetails() {
   const router = useRouter();
   const { user } = useAuth();
-  const { formData, updateFormData, saveFormData, isLoading: isSaving } = useForm();
+  const { formData, updateFormData, saveFormData } = useForm();
 
   const [pageState, setPageState] = useState<PageState>({
     isLoading: true,
@@ -83,8 +82,6 @@ export default function AddRestaurantDetails() {
                 return !!data.ordering_url;
               case 'additional-details':
                 return !!data.history_and_story;
-              case 'banking-information':
-                return !!data.banking_info?.routing_number && !!data.banking_info?.account_number;
               default:
                 return false;
             }
@@ -137,6 +134,27 @@ export default function AddRestaurantDetails() {
     }
   };
 
+  const handleBack = (section: Section) => {
+    setPageState((prev) => ({
+      ...prev,
+      currentSection: section,
+    }));
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const success = await saveFormData();
+      if (success) {
+        router.push('/pricing');
+      }
+    } catch (error) {
+      setPageState((prev) => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Failed to submit form',
+      }));
+    }
+  };
+
   if (pageState.isLoading) {
     return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
   }
@@ -156,12 +174,14 @@ export default function AddRestaurantDetails() {
             <AccordionSection
               key={section}
               section={section}
-              isCompleted={pageState.completedSections.includes(section)}
-              isCurrent={pageState.currentSection === section}
-              onComplete={() => handleSectionComplete(section)}
               formData={formData}
-              onUpdateFormData={updateFormData}
-              isLoading={isSaving}
+              isCompleted={pageState.completedSections.includes(section)}
+              isActive={pageState.currentSection === section}
+              currentSection={pageState.currentSection}
+              onUpdate={updateFormData}
+              onSaveAndNext={handleSectionComplete}
+              onBack={handleBack}
+              onSubmit={handleSubmit}
             />
           ))}
         </Accordion>

@@ -13,6 +13,14 @@ interface RestaurantDetailsSectionProps {
 }
 
 export default function RestaurantDetailsSection({ formData, onChange, onNext, isSaving, isFirstSection }: RestaurantDetailsSectionProps) {
+  const handleNext = async () => {
+    if (!formData.name || !formData.street_address || !formData.contact_email) {
+      // Add validation handling
+      return;
+    }
+    await onNext();
+  };
+
   return (
     <div className="space-y-4 mt-4 w-full">
       <div className="grid grid-cols-2 gap-3 p-1">
@@ -85,7 +93,7 @@ export default function RestaurantDetailsSection({ formData, onChange, onNext, i
         >
           Back
         </Button>
-        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onNext} disabled={isSaving}>
+        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleNext} disabled={isSaving}>
           {isSaving ? 'Saving...' : 'Next'}
         </Button>
       </div>

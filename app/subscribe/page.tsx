@@ -9,7 +9,6 @@ import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe
 import { Button } from '@/components/ui/button';
 import { PartialServerStoreData } from '@/lib/types/types';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { supabaseClient } from '@/lib/supabase-client';
 import { getRegistrationData } from '@/lib/supabase-client';
 
 const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
@@ -105,11 +104,7 @@ function Subscribe() {
 
   useEffect(() => {
     const fetchFormData = async () => {
-      const {
-        data: { session },
-      } = await supabaseClient.auth.getSession();
-
-      if (!session?.user.email) {
+      if (!user?.email) {
         setState((prev) => ({
           ...prev,
           error: 'Authentication required',
@@ -119,7 +114,7 @@ function Subscribe() {
       }
 
       try {
-        const data = await getRegistrationData(session.user.email);
+        const data = await getRegistrationData(user.email);
         if (data) {
           setState((prev) => ({
             ...prev,
@@ -136,7 +131,7 @@ function Subscribe() {
               },
               body: JSON.stringify({
                 priceId: data.selectedPlan,
-                email: session.user.email,
+                email: user.email,
               }),
             });
 
@@ -168,7 +163,7 @@ function Subscribe() {
     };
 
     fetchFormData();
-  }, [supabaseClient]);
+  }, [user]);
 
   if (state.isLoading) {
     return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">Loading...</div>;

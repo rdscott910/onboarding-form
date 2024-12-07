@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { PartialServerStoreData } from '@/lib/types/types';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { supabaseClient } from '@/lib/supabase-client';
 import { getRegistrationData } from '@/lib/supabase-client';
 
 interface PlanFeature {
@@ -92,11 +91,7 @@ export default function PricingPage() {
 
   useEffect(() => {
     const fetchFormData = async () => {
-      const {
-        data: { session },
-      } = await supabaseClient.auth.getSession();
-
-      if (!session?.user.email) {
+      if (!user?.email) {
         setState((prev) => ({
           ...prev,
           error: 'Authentication required',
@@ -106,7 +101,7 @@ export default function PricingPage() {
       }
 
       try {
-        const data = await getRegistrationData(session.user.email);
+        const data = await getRegistrationData(user.email);
         if (data) {
           setState((prev) => ({
             ...prev,
@@ -133,7 +128,7 @@ export default function PricingPage() {
     if (!authLoading) {
       fetchFormData();
     }
-  }, [authLoading]);
+  }, [authLoading, user]);
 
   if (authLoading || state.isLoading) {
     return <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">Loading...</div>;
@@ -183,11 +178,7 @@ function PricingCard({ plan, formData }: PricingCardProps) {
   const [error, setError] = useState<string | null>(null);
 
   const handleChoosePlan = async () => {
-    const {
-      data: { session },
-    } = await supabaseClient.auth.getSession();
-
-    if (!session?.user.email) {
+    if (!user?.email) {
       setError('Your session has expired. Please sign in again.');
       router.push('/');
       return;
@@ -205,7 +196,7 @@ function PricingCard({ plan, formData }: PricingCardProps) {
         body: JSON.stringify({
           ...formData,
           selectedPlan: plan.id,
-          primary_email: session.user.email,
+          primary_email: user.email,
         }),
       });
 

@@ -6,7 +6,6 @@ import dynamic from 'next/dynamic';
 import HappyFace from '@/components/icons/happy-face';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { supabaseClient } from '@/lib/supabase-client';
 import type { Database } from '@/lib/types/supabase';
 
 interface PageState {
@@ -31,10 +30,8 @@ export default function CongratulationsPage() {
 
   useEffect(() => {
     const verifySubscription = async () => {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      
-      if (!session?.user.email) {
-        setState(prev => ({
+      if (!user?.email) {
+        setState((prev) => ({
           ...prev,
           error: 'Authentication required',
           isLoading: false,
@@ -51,7 +48,7 @@ export default function CongratulationsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            email: session.user.email,
+            email: user.email,
           }),
         });
 
@@ -60,14 +57,14 @@ export default function CongratulationsPage() {
           throw new Error(data.message || 'Failed to verify subscription');
         }
 
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           success: true,
           isLoading: false,
         }));
       } catch (error) {
         console.error('Error verifying subscription:', error);
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           error: error instanceof Error ? error.message : 'An unexpected error occurred',
           isLoading: false,
@@ -78,7 +75,7 @@ export default function CongratulationsPage() {
     const { innerWidth: width, innerHeight: height } = window;
     setDimensions({ width, height });
     const timer = setTimeout(() => setShowConfetti(false), 5000); // Stop confetti after 5 seconds
-    const loadingTimer = setTimeout(() => setState(prev => ({ ...prev, isLoading: false })), 5000); // Stop loading after 5 seconds
+    const loadingTimer = setTimeout(() => setState((prev) => ({ ...prev, isLoading: false })), 5000); // Stop loading after 5 seconds
     const handleResize = () => {
       setDimensions({ width: window.innerWidth, height: window.innerHeight });
     };
@@ -91,7 +88,7 @@ export default function CongratulationsPage() {
       clearTimeout(loadingTimer);
       window.removeEventListener('resize', handleResize);
     };
-  }, [router]);
+  }, [router, user]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">

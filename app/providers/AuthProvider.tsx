@@ -4,7 +4,6 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { supabaseClient } from '@/lib/supabase-client';
-import type { Database } from '@/lib/types/supabase';
 import type { AnonymousRegistration } from '@/lib/types/types';
 import { getOrCreateRegistration } from '@/lib/supabase-client';
 
@@ -38,7 +37,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  // Listen for auth state changes
   useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession();
+        if (session) {
+          setSession(session);
+          setUser(session.user);
+
+          if (session.user?.email) {
+            const reg = await getOrCreateRegistration(session.user.email);
+            setRegistration(reg);
+
+            const params = new URLSearchParams(window.location.search);
+            const returnTo = params.get('return_to');
+            if (window.location.pathname === '/') {
+              router.push(returnTo || '/details');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+        setError(error instanceof Error ? error.message : 'Failed to check session');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSession();
+
     const {
       data: { subscription },
     } = supabaseClient.auth.onAuthStateChange(async (_event, session) => {
@@ -48,10 +78,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (session?.user?.email) {
         const reg = await getOrCreateRegistration(session.user.email);
-        console.log('Registration:', reg);
         setRegistration(reg);
+
+        if (_event === 'SIGNED_IN') {
+          const params = new URLSearchParams(window.location.search);
+          const returnTo = params.get('return_to');
+          console.log('Redirecting to:', returnTo || '/details');
+          router.push(returnTo || '/details');
+        }
       } else {
-        console.log('No registration found');
         setRegistration(null);
       }
 
@@ -61,36 +96,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [router]);
 
-  const signIn = async ({ email, password }: { email: string; password: string }) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: signInError } = await supabaseClient.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        throw signInError;
-      }
-
-      if (data?.user?.email) {
-        const reg = await getOrCreateRegistration(data.user.email);
-        setRegistration(reg);
-        router.push('/details');
-      }
-    } catch (err) {
-      console.error('Sign in error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred during sign in');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Sign up with email and password
   const signUp = async ({ email, password, name }: { email: string; password: string; name: string }) => {
     try {
       console.log('Starting signup process:', email);
@@ -105,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: {
             name,
           },
-          // Don't wait for email verification
+          // NOTE:Don't wait for email verification
           emailRedirectTo: undefined,
         },
       });
@@ -133,6 +141,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('Auth error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred during registration');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sign in with email and password
+  const signIn = async ({ email, password }: { email: string; password: string }) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: signInError } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        throw signInError;
+      }
+
+      if (data?.user?.email) {
+        const reg = await getOrCreateRegistration(data.user.email);
+        setRegistration(reg);
+        router.push('/details');
+      }
+    } catch (err) {
+      console.error('Sign in error:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred during sign in');
       throw err;
     } finally {
       setLoading(false);

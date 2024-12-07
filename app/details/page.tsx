@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Accordion } from '@/components/ui/accordion';
 import { PartialServerStoreData } from '@/lib/types/types';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { supabaseClient } from '@/lib/supabase-client';
-import { useForm } from '@/components/providers/FormProvider';
 import { getRegistrationData } from '@/lib/supabase-client';
+import { useForm } from '@/components/providers/FormProvider';
 import AccordionSection from '@/components/details/AccordionSection';
 
 export type Section = 'restaurant-details' | 'hours' | 'restaurant-menu' | 'additional-details';
@@ -58,17 +57,8 @@ export default function AddRestaurantDetails() {
 
   useEffect(() => {
     const loadFormData = async () => {
-      const {
-        data: { session },
-      } = await supabaseClient.auth.getSession();
-
-      if (!session?.user.email) {
-        router.push('/');
-        return;
-      }
-
       try {
-        const data = await getRegistrationData(session.user.email);
+        const data = await getRegistrationData(user?.email || '');
         if (data) {
           updateFormData(data);
           // Update completed sections based on data
@@ -94,20 +84,14 @@ export default function AddRestaurantDetails() {
           ...prev,
           error: error instanceof Error ? error.message : 'Failed to load form data',
         }));
-      } finally {
-        setPageState((prev) => ({ ...prev, isLoading: false }));
       }
     };
-
     loadFormData();
+    setPageState((prev) => ({ ...prev, isLoading: false }));
   }, [user, router, updateFormData]);
 
   const handleSectionComplete = async (section: Section) => {
-    const {
-      data: { session },
-    } = await supabaseClient.auth.getSession();
-
-    if (!session) {
+    if (!user) {
       setPageState((prev) => ({
         ...prev,
         error: 'Your session has expired. Please sign in again.',

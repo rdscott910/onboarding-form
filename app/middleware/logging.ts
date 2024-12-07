@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export async function loggingMiddleware(req: NextRequest) {
-  console.log(`Request made to: ${req.url}`);
-  return NextResponse.next();
+export async function loggingMiddleware(request: NextRequest) {
+  console.log(`[${new Date().toISOString()}] ${request.method} ${request.url}`);
 }

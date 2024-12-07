@@ -1,29 +1,15 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { authMiddleware } from '@/app/middleware/auth';
+import { NextResponse, type NextRequest } from 'next/server';
+import { applyMiddleware } from '@/app/middleware/middleware-chain';
+// import { authMiddleware } from '@/app/middleware/auth';
 import { loggingMiddleware } from '@/app/middleware/logging';
 
-export async function middleware(request: NextRequest) {
-  // Apply logging middleware
-  await loggingMiddleware(request);
+// Define middleware chain
+const middlewareChain = [loggingMiddleware];
 
-  // Apply Supabase auth middleware
-  const response = await authMiddleware(request);
-
-  // Return the response
-  return response;
+export async function middleware(req: NextRequest) {
+  return applyMiddleware(req, middlewareChain);
 }
 
-// Configure which routes use this middleware
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|public/).*)'],
 };

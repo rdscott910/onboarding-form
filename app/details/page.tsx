@@ -10,7 +10,6 @@ import { supabaseClient } from '@/lib/supabase-client';
 import { useForm } from '@/components/providers/FormProvider';
 import { getRegistrationData } from '@/lib/supabase-client';
 import AccordionSection from '@/components/details/AccordionSection';
-import type { Database } from '@/lib/types/supabase';
 
 const INITIAL_FORM_DATA: PartialServerStoreData = {
   name: '',
@@ -60,7 +59,9 @@ export default function AddRestaurantDetails() {
 
   useEffect(() => {
     const loadFormData = async () => {
-      const { data: { session } } = await supabaseClient.auth.getSession();
+      const {
+        data: { session },
+      } = await supabaseClient.auth.getSession();
 
       if (!session?.user.email) {
         router.push('/');
@@ -72,7 +73,7 @@ export default function AddRestaurantDetails() {
         if (data) {
           updateFormData(data);
           // Update completed sections based on data
-          const completed = SECTIONS.filter(section => {
+          const completed = SECTIONS.filter((section) => {
             switch (section) {
               case 'restaurant-details':
                 return !!data.name && !!data.street_address;
@@ -88,16 +89,16 @@ export default function AddRestaurantDetails() {
                 return false;
             }
           });
-          setPageState(prev => ({ ...prev, completedSections: completed }));
+          setPageState((prev) => ({ ...prev, completedSections: completed }));
         }
       } catch (error) {
         console.error('Error loading form data:', error);
-        setPageState(prev => ({
+        setPageState((prev) => ({
           ...prev,
           error: error instanceof Error ? error.message : 'Failed to load form data',
         }));
       } finally {
-        setPageState(prev => ({ ...prev, isLoading: false }));
+        setPageState((prev) => ({ ...prev, isLoading: false }));
       }
     };
 
@@ -105,10 +106,12 @@ export default function AddRestaurantDetails() {
   }, [user, router, updateFormData]);
 
   const handleSectionComplete = async (section: Section) => {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    
+    const {
+      data: { session },
+    } = await supabaseClient.auth.getSession();
+
     if (!session) {
-      setPageState(prev => ({
+      setPageState((prev) => ({
         ...prev,
         error: 'Your session has expired. Please sign in again.',
       }));
@@ -119,7 +122,7 @@ export default function AddRestaurantDetails() {
     try {
       const success = await saveFormData();
       if (success) {
-        setPageState(prev => ({
+        setPageState((prev) => ({
           ...prev,
           completedSections: [...prev.completedSections, section],
           currentSection: SECTIONS[SECTIONS.indexOf(section) + 1],
@@ -127,7 +130,7 @@ export default function AddRestaurantDetails() {
       }
     } catch (error) {
       console.error('Error saving section:', error);
-      setPageState(prev => ({
+      setPageState((prev) => ({
         ...prev,
         error: error instanceof Error ? error.message : 'Failed to save section',
       }));
@@ -146,11 +149,7 @@ export default function AddRestaurantDetails() {
           <p className="text-gray-400 mt-2">Please fill out the following information about your restaurant</p>
         </div>
 
-        {pageState.error && (
-          <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-2 rounded">
-            {pageState.error}
-          </div>
-        )}
+        {pageState.error && <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-2 rounded">{pageState.error}</div>}
 
         <Accordion type="single" collapsible defaultValue={pageState.currentSection}>
           {SECTIONS.map((section) => (

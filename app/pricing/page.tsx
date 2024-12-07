@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { supabaseClient } from '@/lib/supabase-client';
 import { getRegistrationData } from '@/lib/supabase-client';
-import type { Database } from '@/lib/types/supabase';
 
 interface PlanFeature {
   name: string;
@@ -93,10 +92,12 @@ export default function PricingPage() {
 
   useEffect(() => {
     const fetchFormData = async () => {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabaseClient.auth.getSession();
+
       if (!session?.user.email) {
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           error: 'Authentication required',
           isLoading: false,
@@ -107,13 +108,13 @@ export default function PricingPage() {
       try {
         const data = await getRegistrationData(session.user.email);
         if (data) {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             formData: data,
             isLoading: false,
           }));
         } else {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             error: 'No form data found. Please complete the previous steps first.',
             isLoading: false,
@@ -121,7 +122,7 @@ export default function PricingPage() {
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           error: error instanceof Error ? error.message : 'An unexpected error occurred',
           isLoading: false,
@@ -150,9 +151,7 @@ export default function PricingPage() {
           <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 mb-8">
             <p className="text-red-300">{state.error}</p>
           </div>
-          <Button onClick={() => router.push('/details')}>
-            Go Back to Details
-          </Button>
+          <Button onClick={() => router.push('/details')}>Go Back to Details</Button>
         </div>
       </div>
     );
@@ -164,11 +163,7 @@ export default function PricingPage() {
         <h1 className="text-4xl font-bold mb-12 text-center">Choose Your Plan</h1>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {PRICING_PLANS.map((plan) => (
-            <PricingCard
-              key={plan.id}
-              plan={plan}
-              formData={state.formData || {}}
-            />
+            <PricingCard key={plan.id} plan={plan} formData={state.formData || {}} />
           ))}
         </div>
       </div>
@@ -188,8 +183,10 @@ function PricingCard({ plan, formData }: PricingCardProps) {
   const [error, setError] = useState<string | null>(null);
 
   const handleChoosePlan = async () => {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    
+    const {
+      data: { session },
+    } = await supabaseClient.auth.getSession();
+
     if (!session?.user.email) {
       setError('Your session has expired. Please sign in again.');
       router.push('/');

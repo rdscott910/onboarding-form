@@ -5,8 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { supabaseClient } from '@/lib/supabase-client';
-import { getRegistrationData, getOrCreateRegistration } from '@/lib/supabase-client';
-import type { Database } from '@/lib/types/supabase';
+import { getOrCreateRegistration } from '@/lib/supabase-client';
 
 interface FormState {
   name: string;
@@ -273,17 +272,36 @@ export default function CreateAccount() {
         },
       });
 
-      if (signUpError) throw signUpError;
-      if (!signUpData.user) throw new Error('Signup failed - no user returned');
+      if (signUpError) {
+        if (signUpError.message.includes('User already registered')) {
+          setPageState({
+            isSubmitting: false,
+            error: 'User already registered, Signing in instead',
+            success: null,
+          });
+          // 2. Immediately sign in the user
+          const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
+            email: formState.email,
+            password: formState.password,
+          });
+          if (signInError) throw signInError;
+          if (!signInData.user) throw new Error('Sign in failed - please check your email and password');
 
-      // 2. Immediately sign in the user
-      const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
-        email: formState.email,
-        password: formState.password,
-      });
+          // If sign in successful, continue with registration check
+          const registration = await getOrCreateRegistration(formState.email);
+          if (!registration) throw new Error('Failed to create registration record');
 
-      if (signInError) throw signInError;
-      if (!signInData.user) throw new Error('Sign in failed - no user returned');
+          // Redirect to details page
+          router.push('/details');
+          return; // Add return to prevent executing the code below
+        }
+        // Handle other signup errors
+        throw signUpError;
+      }
+
+      if (!signUpData.user) {
+        throw new Error('Signup failed - no user returned');
+      }
 
       // 3. Create or get registration record
       const registration = await getOrCreateRegistration(formState.email);

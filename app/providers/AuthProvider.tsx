@@ -42,13 +42,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      console.log('Auth state changed:', _event, session);
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user?.email) {
         const reg = await getOrCreateRegistration(session.user.email);
+        console.log('Registration:', reg);
         setRegistration(reg);
       } else {
+        console.log('No registration found');
         setRegistration(null);
       }
 

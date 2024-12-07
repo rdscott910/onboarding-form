@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useCallback, Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { CheckIcon, AlertTriangle } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { PartialServerStoreData } from '@/lib/types/types';
 import { useAuth } from '@/app/providers/AuthProvider';
-import type { Database } from '@/lib/types/supabase';
 import { supabaseClient } from '@/lib/supabase-client';
 import { getRegistrationData } from '@/lib/supabase-client';
 
@@ -106,10 +105,12 @@ function Subscribe() {
 
   useEffect(() => {
     const fetchFormData = async () => {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabaseClient.auth.getSession();
+
       if (!session?.user.email) {
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           error: 'Authentication required',
           isLoading: false,
@@ -120,7 +121,7 @@ function Subscribe() {
       try {
         const data = await getRegistrationData(session.user.email);
         if (data) {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             formData: data,
             isLoading: false,
@@ -144,13 +145,13 @@ function Subscribe() {
             }
 
             const stripeData = await stripeResponse.json();
-            setState(prev => ({
+            setState((prev) => ({
               ...prev,
               clientSecret: stripeData.clientSecret,
             }));
           }
         } else {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             error: 'No form data found. Please complete the previous steps first.',
             isLoading: false,
@@ -158,7 +159,7 @@ function Subscribe() {
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           error: error instanceof Error ? error.message : 'An unexpected error occurred',
           isLoading: false,

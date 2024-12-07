@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { getRegistrationData } from '@/lib/supabase-client';
+import { getOrCreateRegistration } from '@/lib/supabase-client';
 import type { Database } from '@/lib/types/supabase';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
     if (!session) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
@@ -19,7 +21,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get the registration data
-    const data = await getRegistrationData(email);
+    const data = await getOrCreateRegistration(email);
     if (!data) {
       return NextResponse.json({ success: false, message: 'No data found' }, { status: 404 });
     }

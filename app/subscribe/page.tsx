@@ -84,7 +84,7 @@ const pricingPlans: PricingPlan[] = [
 const Subscribe = () => {
   const fetchClientSecret = useCallback(async () => {
     // Create a Checkout Session
-    const res = await fetch('/api', {
+    const res = await fetch('/api/checkout', {
       method: 'POST',
     });
     const data = await res.json();

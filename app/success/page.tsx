@@ -11,43 +11,82 @@ const ReactConfetti = dynamic(() => import('react-confetti'), { ssr: false });
 export default function CongratulationsPage() {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [showConfetti, setShowConfetti] = useState(true);
-  const [twilioNumber, setTwilioNumber] = useState<string | null>('123456789');
+  const [twilioNumber, setTwilioNumber] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const deployNumber = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setTimeout(() => {
+        const newNumber = '123456789';
+        setTwilioNumber(newNumber);
+      }, 5000); // Simulated API call for now
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to deploy Twilio number');
+      console.error('Twilio deployment error:', err);
+    } finally {
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 5000);
+    }
+  };
+
+  const handleRetry = () => {
+    if (retryCount < 3) {
+      setRetryCount((prev) => prev + 1);
+      deployNumber();
+    }
+  };
 
   useEffect(() => {
     const { innerWidth: width, innerHeight: height } = window;
     setDimensions({ width, height });
-    const timer = setTimeout(() => setShowConfetti(false), 5000); // Stop confetti after 5 seconds
-    const loadingTimer = setTimeout(() => setIsLoading(false), 5000); // Stop loading after 5 seconds
+
+    const timer = setTimeout(() => setShowConfetti(false), 5000);
+
     const handleResize = () => {
       setDimensions({ width: window.innerWidth, height: window.innerHeight });
     };
     window.addEventListener('resize', handleResize);
 
-    // Deploy Twilio number
-    // const deployNumber = async () => {
-    //   try {
-    //     const restaurantName = 'Your Restaurant Name'; // Replace with actual restaurant name
-    //     const streetAddr = 'Your Street Address'; // Replace with actual street address
-    //     const newNumber = await deployTwilioNumber(restaurantName, streetAddr);
-    //     setTwilioNumber(newNumber);
-    //   } catch (err) {
-    //     setError('Failed to deploy Twilio number. Please try again later.');
-    //     console.error(err);
-    //   } finally {
-    //     setIsLoading(false);
-    //   }
-    // };
-
-    // deployNumber();
+    // Initial deployment
+    deployNumber();
 
     return () => {
       clearTimeout(timer);
-      clearTimeout(loadingTimer);
       window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  const renderTwilioStatus = () => {
+    if (isLoading) {
+      return (
+        <div className="flex flex-col items-center space-y-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          <p className="text-lg">Deploying your number...</p>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="text-center space-y-3">
+          <p className="text-red-400">{error}</p>
+          {retryCount < 3 && (
+            <button onClick={handleRetry} className="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors">
+              Retry Deployment
+            </button>
+          )}
+          {retryCount >= 3 && <p className="text-sm text-red-400">Maximum retry attempts reached. Please contact support.</p>}
+        </div>
+      );
+    }
+
+    return <p className="text-3xl font-bold">{twilioNumber}</p>;
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -68,24 +107,13 @@ export default function CongratulationsPage() {
         </div>
 
         <div className="bg-gray-800 rounded-lg p-6 mb-6">
-          <p className="text-sm text-gray-400 mb-2">Your new customer facing phone number</p>
-          {isLoading ? (
-            <p className="text-3xl font-bold">Loading...</p>
-          ) : error ? (
-            <p className="text-red-500">{error}</p>
-          ) : (
-            <p className="text-3xl font-bold">{twilioNumber}</p>
-          )}
+          <p className="text-sm text-gray-400 mb-4">Your new customer facing phone number</p>
+          {renderTwilioStatus()}
         </div>
 
         <p className="text-sm text-gray-400 mb-8">
           If you do not wish to advertise a new number we have also emailed you instructions on how to forward your current phone
         </p>
-
-        {/* dashboard link */}
-        {/* <button className="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700 transition-colors">
-          Go to dashboard
-        </button> */}
       </div>
     </div>
   );
